@@ -1,0 +1,16 @@
+[
+    {
+        "schema_name": "ANALYTICS",
+        "table_name": "ORDERS",
+        "columns": [
+            {
+                "schema_name": "ANALYTICS",
+                "table_name": "ORDERS",
+                "column_name": "ID",
+                "data_type": "NUMBER",
+                "is_nullable": false,
+                "ordinal_position": 1
+            }
+        ]
+    }
+]

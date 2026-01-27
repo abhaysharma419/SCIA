@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scia"
+version = "0.1.0"
+description = "Deterministic SQL Change Impact Analyzer"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pydantic>=2.0.0",
+    "snowflake-connector-python>=3.0.0",
+    "sqlglot>=20.0.0",
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+scia = "scia.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scia*"]
