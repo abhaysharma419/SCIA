@@ -1,8 +1,12 @@
+"""Risk finding models and classifications."""
 from enum import Enum
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
 
 class FindingType(str, Enum):
+    """Types of schema change findings."""
+
     COLUMN_REMOVED = "COLUMN_REMOVED"
     COLUMN_TYPE_CHANGED = "COLUMN_TYPE_CHANGED"
     COLUMN_NULLABILITY_CHANGED = "COLUMN_NULLABILITY_CHANGED"
@@ -11,11 +15,15 @@ class FindingType(str, Enum):
     POTENTIAL_BREAKAGE = "POTENTIAL_BREAKAGE"
 
 class Severity(str, Enum):
+    """Severity levels for findings."""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
 class Finding(BaseModel):
+    """Represents a single risk finding from schema analysis."""
+
     finding_type: FindingType
     severity: Severity
     base_risk: int

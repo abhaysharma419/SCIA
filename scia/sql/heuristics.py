@@ -1,10 +1,10 @@
-from typing import List, Dict, Any
-from scia.sql.parser import parse_sql, SQLMetadata
+"""SQL signal extraction from query definitions."""
+from typing import Dict
+
+from scia.sql.parser import SQLMetadata, parse_sql
 
 def extract_signals(sql_definitions: Dict[str, str]) -> Dict[str, SQLMetadata]:
-    """
-    Analyzes multiple SQL definitions and extracts signals.
-    """
+    """Extract metadata signals from SQL query definitions."""
     signals = {}
     for name, sql in sql_definitions.items():
         metadata = parse_sql(sql)
