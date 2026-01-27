@@ -474,9 +474,9 @@ Apache 2.0 — See LICENSE file
 
 ## 🚀 What's Next?
 
-- **v0.1** (Current): Core schema diff, risk scoring
-- **v0.2**: Query history awareness, improved detection
-- **v0.3**: Risk policies, notifications, learning
+- **v0.1** (Current): Core schema diff, risk scoring, JSON-based analysis.
+- **v0.2**: SQL migration parsing, live warehouse connectivity (Snowflake), and downstream impact analysis.
+- **v0.3**: Advanced risk policies, incident pattern matching, and multi-warehouse support.
 
 ---
 

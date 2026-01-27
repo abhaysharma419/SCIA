@@ -95,6 +95,11 @@ class SnowflakeInspector:
             logger.warning("Error fetching view definitions: %s", e)
             return {}
 
+    def fetch_foreign_keys(self, database: str, schema: str) -> List[Dict[str, Any]]:
+        """Fetch foreign key relationships (Stub for v0.2)."""
+        # pylint: disable=unused-argument
+        return []
+
     def close(self):
         """Close Snowflake connection."""
         if self.conn:
