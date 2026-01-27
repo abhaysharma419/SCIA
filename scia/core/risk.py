@@ -1,21 +1,27 @@
+"""Risk assessment and classification."""
 from typing import List
-from scia.models.finding import Finding, Severity
 
-class RiskAssessment:
+from scia.models.finding import Finding
+
+class RiskAssessment:  # pylint: disable=too-few-public-methods
+    """Aggregate findings into risk classification."""
+
     def __init__(self, findings: List[Finding]):
+        """Initialize with findings and compute risk score."""
         self.findings = findings
         self.risk_score = sum(f.base_risk for f in findings)
         self.classification = self._classify(self.risk_score)
 
     def _classify(self, score: int) -> str:
+        """Classify risk based on score."""
         if score < 30:
             return "LOW"
-        elif score < 70:
+        if score < 70:
             return "MEDIUM"
-        else:
-            return "HIGH"
+        return "HIGH"
 
     def to_dict(self):
+        """Convert to dictionary representation."""
         return {
             "risk_score": self.risk_score,
             "classification": self.classification,
