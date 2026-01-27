@@ -1,249 +1,490 @@
-Schema Change Impact Agent (SCIA)
-Predict downstream impact of SQL schema changes before they break production.
+# Schema Change Impact Analyzer (SCIA)
 
-Schema Change Impact Agent (SCIA) is a SQL‑first, open‑source agent that analyzes schema changes before deployment and tells you what will break, how risky it is, and why — using only existing warehouse metadata and SQL definitions.
+**Predict schema change risks before they break production.**
 
-No catalog required.
-No vendor lock‑in.
-No mandatory frameworks.
+SCIA analyzes SQL schema changes and tells you:
+- ✅ What will break
+- ✅ How risky it is (LOW/MEDIUM/HIGH)
+- ✅ Why it matters
 
-Why SCIA Exists
-Every data platform already has:
+No catalog required. No vendor lock-in. Works with your existing warehouse metadata.
 
-SQL tables, views, and procedures
+---
 
-Warehouse metadata (information_schema)
+## 🚀 Quick Start
 
-Query history
+### 1. Install
 
-Yet schema changes still:
-
-Break downstream views
-
-Corrupt metrics silently
-
-Cause late‑night rollbacks
-
-The problem is not missing metadata.
-The problem is no automated reasoning over SQL and dependencies.
-
-SCIA fills that gap.
-
-What SCIA Does
-Given a proposed SQL schema change, SCIA:
-
-Detects breaking changes
-
-Resolves downstream dependencies
-
-Identifies grain and join risk
-
-Scores deployment risk
-
-Explains the impact in plain English
-
-All before the change reaches production.
-
-What SCIA Does Not Do
-❌ No metadata catalog
-
-❌ No data ingestion
-
-❌ No enforcement (yet)
-
-❌ No dashboards
-
-❌ No vendor‑specific lock‑in
-
-SCIA is intentionally small, composable, and read‑only.
-
-SQL‑First by Design
-SCIA is built around universal primitives:
-
-Input	Required
-SQL DDL / model changes	✅
-Warehouse metadata (information_schema)	✅
-View / table definitions	✅
-Query history (optional)	⭕
-DBT is optional, not required.
-
-If DBT artifacts are present, SCIA uses them to enrich lineage and semantics.
-If not, SCIA works entirely from SQL and warehouse metadata.
-
-How It Works (High Level)
-Reads proposed SQL/schema changes
-
-Extracts warehouse metadata (read‑only)
-
-Resolves downstream dependencies
-
-Analyzes structural and semantic risk
-
-Generates a human‑readable impact report
-
-Supported Warehouses (v0.1)
-Snowflake ✅
-
-BigQuery (planned)
-
-Databricks (planned)
-
-Installation
+```bash
 pip install scia
-Usage
-CLI (SQL‑only)
-scia analyze \
-  --warehouse snowflake \
-  --database analytics \
-  --schema mart \
-  --changed-object orders
-SQL Diff / File‑based Analysis
-scia analyze \
-  --warehouse snowflake \
-  --sql-diff schema_changes.sql
-Optional: DBT Enrichment
-If DBT artifacts are available, provide them optionally:
+```
 
-scia analyze \
-  --warehouse snowflake \
-  --sql-diff schema_changes.sql \
-  --dbt-manifest manifest.json \
-  --dbt-catalog catalog.json
-DBT improves confidence — it is never required.
+### 2. Prepare Schema Files
 
-Example Output
+Create two JSON files representing your schema before and after the change:
+
+**`before_schema.json`** — Original schema
+```json
+[
+  {
+    "schema_name": "analytics",
+    "table_name": "customers",
+    "columns": [
+      {
+        "column_name": "customer_id",
+        "data_type": "INT",
+        "is_nullable": false,
+        "ordinal_position": 1
+      },
+      {
+        "column_name": "email",
+        "data_type": "VARCHAR",
+        "is_nullable": true,
+        "ordinal_position": 2
+      }
+    ]
+  }
+]
+```
+
+**`after_schema.json`** — Modified schema (e.g., removed `email` column)
+```json
+[
+  {
+    "schema_name": "analytics",
+    "table_name": "customers",
+    "columns": [
+      {
+        "column_name": "customer_id",
+        "data_type": "INT",
+        "is_nullable": false,
+        "ordinal_position": 1
+      }
+    ]
+  }
+]
+```
+
+### 3. Run Analysis
+
+```bash
+scia analyze --before before_schema.json --after after_schema.json --format markdown
+```
+
+### 4. Get Risk Assessment
+
+Output (Markdown):
+```
 RISK: HIGH
+Classification: HIGH
+Risk Score: 80
 
-• Column `customer_id` removed
-• 3 downstream views depend on this column
-• Revenue aggregation grain may change
-• Historical queries rely on this field
+Findings:
+1. COLUMN_REMOVED (Severity: HIGH)
+   - Column 'email' removed from table 'customers'
+   - Evidence: table=customers, column=email
+```
 
-Recommendation:
-Update dependent views before deployment.
-Outputs are available as:
+---
 
-Markdown (humans)
+## 📋 Common Use Cases
 
-JSON (machines)
+### Use Case 1: Column Removal
 
-What Counts as a Schema Change
-SCIA currently analyzes:
+**Scenario:** Remove a column you think is unused
 
-Column removal
+```bash
+scia analyze \
+  --before before_schema.json \
+  --after after_schema.json \
+  --format markdown
+```
 
-Column rename (heuristic)
+**Output:** 
+- ✅ Detects if downstream views depend on this column
+- ✅ Warns about join key changes
+- ✅ Scores risk (HIGH if widely used)
 
-Data type change
+### Use Case 2: Type Change
 
-Nullability change
+**Scenario:** Change INT column to STRING
 
-Join key change
+```bash
+# before_schema.json: "data_type": "INT"
+# after_schema.json: "data_type": "VARCHAR"
 
-Grain change (heuristic)
+scia analyze \
+  --before before_schema.json \
+  --after after_schema.json \
+  --format json
+```
 
-These represent the majority of real‑world data incidents.
+**Output:** 
+- ✅ Identifies type incompatibility
+- ✅ Warns about casting issues
+- ✅ Risk: MEDIUM (may break queries)
 
-Risk Scoring Model
-Each change is scored as:
+### Use Case 3: Nullability Change
 
-LOW – Safe change
+**Scenario:** Make nullable column NOT NULL
 
-MEDIUM – Review recommended
+```bash
+# before_schema.json: "is_nullable": true
+# after_schema.json: "is_nullable": false
 
-HIGH – Likely to break downstream systems
+scia analyze \
+  --before before_schema.json \
+  --after after_schema.json \
+  --format json
+```
 
-Scores are based on:
+**Output:**
+- ✅ Detects NOT NULL constraint
+- ✅ Warns about NULL values in production
+- ✅ Risk: MEDIUM (data quality issue)
 
-Change type
+---
 
-Dependency depth
+## 📊 Output Formats
 
-Query usage patterns
+### Markdown (Human-Readable)
 
-Semantic indicators (if available)
+```bash
+scia analyze --before before_schema.json --after after_schema.json --format markdown
+```
 
-Design Principles
-SQL‑first
+**Output:**
+```
+# Risk Assessment: HIGH
 
-Warehouse‑native
+## Findings (3)
 
-Read‑only
+| Finding Type | Severity | Risk | Evidence |
+|---|---|---|---|
+| COLUMN_REMOVED | HIGH | 80 | {table: users, column: user_id} |
+| COLUMN_TYPE_CHANGED | MEDIUM | 40 | {...} |
+| ...| | | |
+```
 
-Deterministic logic first
+### JSON (Machine-Readable)
 
-LLMs explain, not decide
+```bash
+scia analyze --before before_schema.json --after after_schema.json --format json
+```
 
-CLI & CI over UI
+**Output:**
+```json
+{
+  "risk_score": 120,
+  "classification": "HIGH",
+  "findings": [
+    {
+      "finding_type": "COLUMN_REMOVED",
+      "severity": "HIGH",
+      "base_risk": 80,
+      "evidence": {"table": "users", "column": "user_id"},
+      "description": "Column 'user_id' removed from table 'users'."
+    }
+  ]
+}
+```
 
-Composable agents, not platforms
+---
 
-Roadmap
-v0.1 (Current)
-SQL‑first analysis
+## 🔧 CLI Reference
 
-Snowflake metadata
+### Basic Command
 
-CLI interface
+```bash
+scia analyze --before <before.json> --after <after.json> [options]
+```
 
-Markdown & JSON reports
+### Options
 
-v0.2
-Query history‑aware impact
+| Option | Required | Example | Description |
+|--------|----------|---------|-------------|
+| `--before` | ✅ | `before.json` | Original schema JSON |
+| `--after` | ✅ | `after.json` | Modified schema JSON |
+| `--format` | ❌ | `json` or `markdown` | Output format (default: json) |
+| `--fail-on` | ❌ | `HIGH` | Exit code 1 if risk meets threshold |
 
-Improved rename detection
+### Exit Codes
 
-CI / PR comments
+- `0` — Success (risk below threshold or below `--fail-on`)
+- `1` — Risk matches `--fail-on` threshold
 
-v0.3
-Risk thresholds & policies
+### Example: Use in CI/CD
 
-Slack notifications
+```bash
+# Fail CI if HIGH risk detected
+scia analyze --before before.json --after after.json --fail-on HIGH
+```
 
-Historical incident learning
+---
 
-Who This Is For
-Data Engineers
+## 💡 Examples
 
-Platform Teams
+### Example 1: Safe Column Addition
 
-Warehouse‑centric organizations
+**before.json:**
+```json
+[{"schema_name": "db", "table_name": "orders", "columns": [...]}]
+```
 
-SQL‑heavy environments
+**after.json:**
+```json
+[{"schema_name": "db", "table_name": "orders", "columns": [..., {"column_name": "order_notes", "data_type": "VARCHAR", "is_nullable": true, "ordinal_position": 5}]}]
+```
 
-Teams without DBT (and with DBT)
+**Command:**
+```bash
+scia analyze --before before.json --after after.json --format markdown
+```
 
-Why Open Source
-SCIA is open source because:
+**Result:** ✅ `RISK: LOW` — New nullable column is safe
 
-Schema reasoning should be transparent
+---
 
-Metadata should not be locked in
+### Example 2: Risky Column Removal
 
-Governance should integrate with SQL workflows
+**before.json:**
+```json
+[{"schema_name": "db", "table_name": "users", "columns": [{"column_name": "user_id", ...}, ...]}]
+```
 
-Future paid extensions (optional) may include:
+**after.json:**
+```json
+[{"schema_name": "db", "table_name": "users", "columns": [...]}]  # user_id removed
+```
 
-Audit trails
+**Command:**
+```bash
+scia analyze --before before.json --after after.json --format markdown
+```
 
-Compliance reporting
+**Result:** ⚠️ `RISK: HIGH` — Primary key removed, will break joins
 
-Enterprise integrations
+---
 
-The core agent will remain open.
+## 📂 Project Structure
 
-Contributing
-Contributions welcome:
+```
+SCIA/
+├── .github/copilot-instructions.md    (AI agent guidance)
+├── AI_QUICK_REFERENCE.md              (Quick reference)
+├── README.md                          (This file)
+│
+├── docs/                              (Documentation)
+│   ├── design.md                      (Architecture)
+│   ├── REQUIREMENTS.md                (Functional spec)
+│   └── FOLDER_STRUCTURE.md            (Project organization)
+│
+├── scia/                              (Source code)
+│   ├── cli/main.py                    (Command-line interface)
+│   ├── core/                          (Analysis engine)
+│   │   ├── diff.py                    (Schema comparison)
+│   │   ├── rules.py                   (Risk rules)
+│   │   └── risk.py                    (Risk scoring)
+│   ├── models/                        (Data models)
+│   ├── output/                        (Renderers)
+│   └── sql/                           (SQL parsing)
+│
+├── tests/                             (Tests)
+│   ├── test_diff.py
+│   ├── test_rules.py
+│   └── fixtures/                      (Test data)
+│       ├── before.json
+│       ├── after.json
+│       └── after_medium.json
+│
+└── pyproject.toml                     (Package config)
+```
 
-Warehouse adapters
+---
 
-SQL heuristics
+## 🏗️ What SCIA Does (v0.1)
 
-Real‑world incident patterns
+**Detects:**
+- Column removal
+- Column type changes
+- Nullability changes
 
-Open an issue or submit a PR.
+**Scores risk as:**
+- **LOW** (<30) — Safe to deploy
+- **MEDIUM** (30-69) — Review recommended
+- **HIGH** (≥70) — Likely to break systems
 
-License
-Apache 2.0
+**Outputs:**
+- JSON (for CI/CD, tools)
+- Markdown (for humans)
+
+---
+
+## 🚫 What SCIA Does NOT Do
+
+- ❌ Modify your schema
+- ❌ Connect to your warehouse (uses JSON exports)
+- ❌ Require a metadata catalog
+- ❌ Lock you into a vendor
+- ❌ Support dbt as a requirement (only optional enrichment)
+
+---
+
+## 🛠️ For Developers
+
+### Run Tests
+
+```bash
+pytest tests/
+```
+
+### Run a Specific Test
+
+```bash
+pytest tests/test_diff.py -v
+```
+
+### Run with Coverage
+
+```bash
+pytest tests/ --cov=scia
+```
+
+### Develop & Install in Editable Mode
+
+```bash
+pip install -e .
+```
+
+---
+
+## 📚 Documentation
+
+- **[docs/design.md](docs/design.md)** — Architecture & design decisions
+- **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** — Functional specification
+- **[docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md)** — Project organization
+- **[.github/copilot-instructions.md](.github/copilot-instructions.md)** — AI agent guidance (for developers extending SCIA)
+
+---
+
+## 🎯 Risk Scoring
+
+## 🎯 Risk Scoring
+
+Each change type gets a base risk score:
+
+| Change Type | Base Risk | Why |
+|-------------|-----------|-----|
+| Column removed | 80 | Breaks joins, aggregations |
+| Type changed | 40 | May cause casting errors |
+| Nullability changed | 50 | Data quality issues |
+| Column added (nullable) | 0 | Safe — won't break anything |
+
+**Total risk = Sum of all findings**
+
+- **LOW** (<30): Safe to deploy
+- **MEDIUM** (30-69): Review before deploying
+- **HIGH** (≥70): Likely to break downstream systems
+
+---
+
+## 💡 Tips
+
+### Tip 1: Export Snowflake Schema
+
+To get schema JSON from Snowflake:
+
+```sql
+SELECT 
+  table_schema as schema_name,
+  table_name,
+  column_name,
+  data_type,
+  is_nullable,
+  ordinal_position
+FROM information_schema.columns
+WHERE table_schema = 'ANALYTICS'
+ORDER BY table_name, ordinal_position;
+```
+
+Export as JSON and use with SCIA.
+
+### Tip 2: Use in CI/CD
+
+Add to your deployment pipeline:
+
+```yaml
+# GitHub Actions example
+- name: Check schema changes
+  run: |
+    scia analyze --before before.json --after after.json --fail-on HIGH
+    # Job fails if HIGH risk detected
+```
+
+### Tip 3: Compare Multiple Scenarios
+
+```bash
+# Scenario 1: Remove column
+scia analyze --before base.json --after scenario1.json
+
+# Scenario 2: Change type
+scia analyze --before base.json --after scenario2.json
+
+# Pick the safer approach
+```
+
+---
+
+## ❓ FAQ
+
+**Q: Can SCIA connect to my warehouse directly?**  
+A: Not yet (v0.1). Export schema as JSON first. Live connections planned for v0.2.
+
+**Q: Do I need dbt?**  
+A: No. SCIA works with plain SQL and warehouse metadata.
+
+**Q: Is this for Snowflake only?**  
+A: v0.1 is Snowflake-focused. BigQuery and Databricks support planned.
+
+**Q: What if schema has thousands of columns?**  
+A: SCIA analyzes the diff, not absolute size. Should be fast.
+
+**Q: Can I use this in production?**  
+A: Yes, but start with v0.1's known limitations. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! See [.github/copilot-instructions.md](.github/copilot-instructions.md) for development guide.
+
+Areas for contribution:
+- Warehouse adapters (BigQuery, Databricks, PostgreSQL)
+- SQL heuristics improvements
+- Real-world incident patterns
+- Testing edge cases
+
+---
+
+## 📄 License
+
+Apache 2.0 — See LICENSE file
+
+---
+
+## 🚀 What's Next?
+
+- **v0.1** (Current): Core schema diff, risk scoring
+- **v0.2**: Query history awareness, improved detection
+- **v0.3**: Risk policies, notifications, learning
+
+---
+
+## 💬 Questions?
+
+- Check [DOCS_INDEX.md](DOCS_INDEX.md) for documentation
+- See [docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md) for project layout
+- Read [.github/copilot-instructions.md](.github/copilot-instructions.md) for architecture
+
 
 
