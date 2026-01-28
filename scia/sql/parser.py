@@ -61,3 +61,37 @@ def parse_sql(sql: str) -> Optional[SQLMetadata]:
     except (AttributeError, ValueError, TypeError) as e:
         logger.warning("SQL parsing failed: %s", e)
         return None
+
+def extract_table_references(sql: str, dialect: str = 'snowflake') -> List[str]:
+    """Extract all table references from a SQL query.
+    
+    Args:
+        sql: SQL query text
+        dialect: SQL dialect (default: snowflake)
+        
+    Returns:
+        List of table names referenced in qualified format (schema.table or just table).
+        Empty list if parsing fails.
+    """
+    try:
+        statements = sqlglot.parse(sql, read=dialect)
+        tables = set()
+        
+        for stmt in statements:
+            if not stmt:
+                continue
+            
+            for table in stmt.find_all(exp.Table):
+                # Get fully qualified table name
+                if hasattr(table, 'db') and table.db:
+                    qualified_name = f"{table.db}.{table.name}".upper()
+                else:
+                    qualified_name = table.name.upper()
+                
+                tables.add(qualified_name)
+        
+        return sorted(list(tables))
+        
+    except Exception as e:  # pylint: disable=broad-except
+        logger.warning("Failed to extract table references: %s", e)
+        return []
