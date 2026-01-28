@@ -14,8 +14,8 @@ class ConnectionConfigError(ValueError):
 
 
 def load_connection_config(
-    conn_file: Optional[str] = None,
-    warehouse: Optional[str] = None
+    warehouse: Optional[str] = None,
+    conn_file: Optional[str] = None
 ) -> Dict[str, Any]:
     """Load warehouse connection configuration.
 
@@ -25,8 +25,8 @@ def load_connection_config(
     3. Sensible defaults if none provided
 
     Args:
-        conn_file: Optional explicit connection file path
         warehouse: Warehouse type (snowflake, databricks, postgres, redshift)
+        conn_file: Optional explicit connection file path
 
     Returns:
         Dictionary with connection configuration
