@@ -21,7 +21,7 @@ def test_snowflake_adapter_init(adapter):
 def test_snowflake_adapter_connect_success(adapter):
     """Test successful Snowflake connection."""
     mock_conn = MagicMock()
-    
+
     with patch('snowflake.connector.connect', return_value=mock_conn):
         config = {
             'account': 'test-account',
@@ -35,8 +35,8 @@ def test_snowflake_adapter_connect_success(adapter):
 def test_snowflake_adapter_connect_failure(adapter):
     """Test connection failure handling."""
     import snowflake.connector  # pylint: disable=import-error,no-name-in-module
-    
-    with patch('snowflake.connector.connect', 
+
+    with patch('snowflake.connector.connect',
                side_effect=snowflake.connector.errors.Error("Connection failed")):
         config = {'account': 'invalid'}
         with pytest.raises(snowflake.connector.errors.Error):
@@ -52,13 +52,13 @@ def test_snowflake_adapter_fetch_schema_success(adapter):
         ('PUBLIC', 'USERS', 'NAME', 'VARCHAR', 'YES', 2),
         ('PUBLIC', 'ORDERS', 'ORDER_ID', 'INTEGER', 'NO', 1),
     ]
-    
+
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     adapter.conn = mock_conn
 
     schemas = adapter.fetch_schema('PROD', 'PUBLIC')
-    
+
     assert len(schemas) == 2
     assert schemas[0].table_name == 'USERS'
     assert len(schemas[0].columns) == 2
@@ -74,10 +74,10 @@ def test_snowflake_adapter_fetch_schema_no_connection(adapter):
 def test_snowflake_adapter_fetch_schema_failure(adapter):
     """Test schema fetch failure handling."""
     import snowflake.connector  # pylint: disable=import-error,no-name-in-module
-    
+
     mock_cursor = MagicMock()
     mock_cursor.execute.side_effect = snowflake.connector.errors.Error("Query failed")
-    
+
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     adapter.conn = mock_conn
@@ -93,13 +93,13 @@ def test_snowflake_adapter_fetch_views_success(adapter):
         ('VIEW_A', 'SELECT * FROM USERS'),
         ('VIEW_B', 'SELECT * FROM ORDERS'),
     ]
-    
+
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     adapter.conn = mock_conn
 
     views = adapter.fetch_views('PROD', 'PUBLIC')
-    
+
     assert len(views) == 2
     assert views['VIEW_A'] == 'SELECT * FROM USERS'
     assert views['VIEW_B'] == 'SELECT * FROM ORDERS'
@@ -117,13 +117,13 @@ def test_snowflake_adapter_fetch_foreign_keys_success(adapter):
     mock_cursor.fetchall.return_value = [
         ('FK_USER_ID', 'ORDERS', 'USER_ID', 'USERS', 'USER_ID'),
     ]
-    
+
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     adapter.conn = mock_conn
 
     fks = adapter.fetch_foreign_keys('PROD', 'PUBLIC')
-    
+
     assert len(fks) == 1
     assert fks[0]['constraint_name'] == 'FK_USER_ID'
     assert fks[0]['table_name'] == 'ORDERS'
@@ -155,9 +155,9 @@ def test_snowflake_adapter_close(adapter):
     """Test connection close."""
     mock_conn = MagicMock()
     adapter.conn = mock_conn
-    
+
     adapter.close()
-    
+
     assert adapter.conn is None
     mock_conn.close.assert_called_once()
 

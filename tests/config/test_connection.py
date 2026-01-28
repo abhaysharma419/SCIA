@@ -22,9 +22,9 @@ def test_load_from_explicit_file(tmp_path):
         'password': 'test-password'
     }
     config_file.write_text(yaml.dump(config_data))
-    
+
     config = load_connection_config('snowflake', str(config_file))
-    
+
     assert config['account'] == 'test-account'
     assert config['user'] == 'test-user'
 
@@ -36,16 +36,16 @@ def test_load_from_default_path(tmp_path):
         scia_dir = tmp_path / '.scia'
         scia_dir.mkdir()
         config_file = scia_dir / 'snowflake.yaml'
-        
+
         config_data = {
             'account': 'default-account',
             'user': 'default-user',
             'password': 'default-password'
         }
         config_file.write_text(yaml.dump(config_data))
-        
+
         config = load_connection_config('snowflake')
-        
+
         assert config['account'] == 'default-account'
 
 
@@ -58,7 +58,7 @@ def test_load_from_environment_variables(tmp_path):
     }):
         with patch('pathlib.Path.home', return_value=tmp_path):
             config = load_connection_config('snowflake')
-            
+
             assert config['account'] == 'env-account'
             assert config['user'] == 'env-user'
 
@@ -68,15 +68,15 @@ def test_load_explicit_overrides_default(tmp_path):
     explicit_file = tmp_path / "explicit.yaml"
     explicit_data = {'account': 'explicit-account', 'user': 'explicit-user'}
     explicit_file.write_text(yaml.dump(explicit_data))
-    
+
     default_path = tmp_path / '.scia' / 'snowflake.yaml'
     default_path.parent.mkdir(parents=True)
     default_data = {'account': 'default-account'}
     default_path.write_text(yaml.dump(default_data))
-    
+
     with patch('pathlib.Path.home', return_value=tmp_path):
         config = load_connection_config('snowflake', str(explicit_file))
-        
+
         assert config['account'] == 'explicit-account'
 
 
@@ -90,7 +90,7 @@ def test_load_invalid_yaml(tmp_path):
     """Test error with invalid YAML file."""
     config_file = tmp_path / "bad.yaml"
     config_file.write_text("{ invalid yaml [")
-    
+
     with pytest.raises(ConnectionConfigError, match="Invalid YAML"):
         load_connection_config('snowflake', str(config_file))
 
@@ -99,7 +99,7 @@ def test_load_yaml_not_dict(tmp_path):
     """Test error when YAML is not a dictionary."""
     config_file = tmp_path / "list.yaml"
     config_file.write_text("- item1\n- item2")
-    
+
     with pytest.raises(ConnectionConfigError, match="dictionary"):
         load_connection_config('snowflake', str(config_file))
 
@@ -107,7 +107,7 @@ def test_load_yaml_not_dict(tmp_path):
 def test_get_snowflake_defaults():
     """Test default config for Snowflake."""
     config = load_connection_config('snowflake')
-    
+
     assert 'account' in config
     assert 'user' in config
     assert 'password' in config
@@ -117,7 +117,7 @@ def test_get_snowflake_defaults():
 def test_get_postgres_defaults():
     """Test default config for PostgreSQL."""
     config = load_connection_config('postgres')
-    
+
     assert config['host'] == 'localhost'
     assert config['port'] == 5432
 
@@ -129,7 +129,7 @@ def test_validate_snowflake_config():
         'user': 'user',
         'password': 'pass'
     }
-    
+
     assert validate_connection_config('snowflake', config) is True
 
 
@@ -140,7 +140,7 @@ def test_validate_missing_required_field():
         'user': 'user'
         # Missing password
     }
-    
+
     with pytest.raises(ConnectionConfigError, match="Missing required"):
         validate_connection_config('snowflake', config)
 
@@ -153,7 +153,7 @@ def test_validate_postgres_config():
         'password': 'pass',
         'database': 'mydb'
     }
-    
+
     assert validate_connection_config('postgres', config) is True
 
 
@@ -164,6 +164,6 @@ def test_validate_empty_field():
         'user': 'user',
         'password': 'pass'
     }
-    
+
     with pytest.raises(ConnectionConfigError, match="Missing required"):
         validate_connection_config('snowflake', config)
