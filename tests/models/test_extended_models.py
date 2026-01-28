@@ -1,6 +1,4 @@
 """Tests for extended data models."""
-import pytest
-
 from scia.models.finding import (
     DependencyObject,
     EnrichedFinding,
@@ -54,9 +52,9 @@ def test_impact_detail_empty():
     """Test creating empty ImpactDetail."""
     impact = ImpactDetail()
 
-    assert impact.direct_dependents == []
-    assert impact.transitive_dependents == []
-    assert impact.affected_applications == []
+    assert not impact.direct_dependents
+    assert not impact.transitive_dependents
+    assert not impact.affected_applications
     assert impact.estimated_blast_radius == 0
 
 
