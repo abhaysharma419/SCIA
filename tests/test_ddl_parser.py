@@ -17,7 +17,7 @@ def test_parse_create_table_simple():
     )
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert len(schemas) == 1
     assert schemas[0].table_name == 'USERS'
     assert len(schemas[0].columns) == 2
@@ -38,7 +38,7 @@ def test_parse_create_table_multiple_columns():
     )
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert len(schemas) == 1
     assert len(schemas[0].columns) == 4
     assert all(col.table_name == 'ORDERS' for col in schemas[0].columns)
@@ -54,7 +54,7 @@ def test_parse_create_table_with_constraints():
     )
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert len(schemas) == 1
     assert schemas[0].columns[0].is_nullable is False
     assert schemas[0].columns[1].is_nullable is False
@@ -66,13 +66,13 @@ def test_parse_multiple_create_tables():
     CREATE TABLE users (
         user_id INTEGER
     );
-    
+
     CREATE TABLE orders (
         order_id INTEGER
     );
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert len(schemas) == 2
     table_names = {s.table_name for s in schemas}
     assert 'USERS' in table_names
@@ -101,7 +101,7 @@ def test_parse_unsupported_statements():
     CREATE TABLE orders (order_id INTEGER);
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     # Should get both tables, skipping the procedure
     assert len(schemas) == 2
 
@@ -116,7 +116,7 @@ def test_parse_snowflake_syntax():
     )
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert len(schemas) == 1
     assert len(schemas[0].columns) == 3
 
@@ -131,7 +131,7 @@ def test_ordinal_position():
     )
     """
     schemas = parse_ddl_to_schema(ddl)
-    
+
     assert schemas[0].columns[0].ordinal_position == 1
     assert schemas[0].columns[1].ordinal_position == 2
     assert schemas[0].columns[2].ordinal_position == 3
@@ -141,7 +141,7 @@ def test_extract_table_references_single_table():
     """Test extracting table references from SELECT with single table."""
     sql = "SELECT * FROM users"
     tables = extract_table_references(sql)
-    
+
     assert 'USERS' in tables
 
 
@@ -153,7 +153,7 @@ def test_extract_table_references_multiple_tables():
     JOIN orders o ON u.user_id = o.user_id
     """
     tables = extract_table_references(sql)
-    
+
     assert 'USERS' in tables
     assert 'ORDERS' in tables
 
@@ -162,7 +162,7 @@ def test_extract_table_references_qualified_names():
     """Test extracting qualified table names."""
     sql = "SELECT * FROM schema.users"
     tables = extract_table_references(sql)
-    
+
     assert 'SCHEMA.USERS' in tables
 
 
@@ -170,7 +170,7 @@ def test_extract_table_references_no_tables():
     """Test extracting references from query with no tables."""
     sql = "SELECT 1 + 1"
     tables = extract_table_references(sql)
-    
+
     assert tables == []
 
 
@@ -178,6 +178,6 @@ def test_extract_table_references_invalid_sql():
     """Test graceful handling of invalid SQL."""
     sql = "NOT VALID SQL HERE"
     tables = extract_table_references(sql)
-    
+
     # Should return empty list without raising
     assert isinstance(tables, list)

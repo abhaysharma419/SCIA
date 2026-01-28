@@ -47,7 +47,7 @@ def test_warehouse_adapter_requires_all_methods():
         'parse_table_references',
         'close'
     }
-    
+
     # Verify all methods are abstract
     for method_name in abstract_methods:
         assert hasattr(WarehouseAdapter, method_name)

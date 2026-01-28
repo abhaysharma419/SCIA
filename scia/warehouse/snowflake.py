@@ -19,7 +19,7 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def connect(self, config: Dict[str, Any]) -> None:
         """Establish connection to Snowflake warehouse.
-        
+
         Args:
             config: Connection configuration with keys:
                 - account: Snowflake account identifier
@@ -28,7 +28,7 @@ class SnowflakeAdapter(WarehouseAdapter):
                 - warehouse: Warehouse name (optional)
                 - database: Database name (optional)
                 - schema: Schema name (optional)
-                
+
         Raises:
             snowflake.connector.errors.Error: If connection fails
         """
@@ -41,11 +41,11 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def fetch_schema(self, database: str, schema: str) -> List[TableSchema]:
         """Fetch schema metadata for all tables in a Snowflake schema.
-        
+
         Args:
             database: Database name
             schema: Schema name
-            
+
         Returns:
             List of TableSchema objects with columns. Empty list on failure.
         """
@@ -104,11 +104,11 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def fetch_views(self, database: str, schema: str) -> Dict[str, str]:
         """Fetch view definitions for all views in a Snowflake schema.
-        
+
         Args:
             database: Database name
             schema: Schema name
-            
+
         Returns:
             Dictionary mapping view name to view definition SQL.
             Empty dict on failure or if no views found.
@@ -136,11 +136,11 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def fetch_foreign_keys(self, database: str, schema: str) -> List[Dict[str, Any]]:
         """Fetch foreign key constraints for a Snowflake schema.
-        
+
         Args:
             database: Database name
             schema: Schema name
-            
+
         Returns:
             List of foreign key definitions. Empty list on failure.
         """
@@ -162,7 +162,7 @@ class SnowflakeAdapter(WarehouseAdapter):
             """
             cursor.execute(query)
             rows = cursor.fetchall()
-            
+
             result = []
             for row in rows:
                 result.append({
@@ -172,7 +172,7 @@ class SnowflakeAdapter(WarehouseAdapter):
                     'referenced_table': row[3],
                     'referenced_column': row[4]
                 })
-            
+
             logger.info("Fetched %d foreign keys from %s.%s", len(result), database, schema)
             return result
 
@@ -182,12 +182,12 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def parse_table_references(self, sql: str) -> List[str]:
         """Parse SQL statement and extract table references.
-        
+
         Uses sqlglot to parse SQL in Snowflake dialect.
-        
+
         Args:
             sql: SQL statement text
-            
+
         Returns:
             List of table names referenced (schema.table format).
             Empty list on parse failure.

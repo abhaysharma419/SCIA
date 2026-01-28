@@ -15,9 +15,9 @@ def test_resolve_json_mode(tmp_path):
     after_file = tmp_path / "after.json"
     before_file.write_text('[]')
     after_file.write_text('[]')
-    
+
     input_type, metadata = resolve_input(str(before_file), str(after_file))
-    
+
     assert input_type == InputType.JSON
     assert metadata['input_type'] == 'json'
     assert metadata['before_format'] == 'json'
@@ -30,9 +30,9 @@ def test_resolve_sql_mode_json_to_sql(tmp_path):
     after_file = tmp_path / "after.sql"
     before_file.write_text('[]')
     after_file.write_text('CREATE TABLE test (id INT);')
-    
+
     input_type, metadata = resolve_input(str(before_file), str(after_file))
-    
+
     assert input_type == InputType.SQL
     assert metadata['before_format'] == 'json'
     assert metadata['after_format'] == 'sql'
@@ -44,9 +44,9 @@ def test_resolve_sql_mode_sql_to_json(tmp_path):
     after_file = tmp_path / "after.json"
     before_file.write_text('CREATE TABLE test (id INT);')
     after_file.write_text('[]')
-    
+
     input_type, metadata = resolve_input(str(before_file), str(after_file))
-    
+
     assert input_type == InputType.SQL
 
 
@@ -63,7 +63,7 @@ def test_resolve_database_mode_with_warehouse():
         'DEV.ANALYTICS',
         warehouse='snowflake'
     )
-    
+
     assert input_type == InputType.DATABASE
     assert metadata['input_type'] == 'database'
     assert metadata['warehouse'] == 'snowflake'
@@ -76,7 +76,7 @@ def test_resolve_database_single_part_reference():
         'SCHEMA2.TABLE2',
         warehouse='snowflake'
     )
-    
+
     assert input_type == InputType.DATABASE
     assert metadata['before_format'] == 'database'
 
@@ -97,13 +97,13 @@ def test_resolve_mixed_with_warehouse(tmp_path):
     """Test mixed mode with warehouse specified."""
     before_file = tmp_path / "before.json"
     before_file.write_text('[]')
-    
+
     input_type, metadata = resolve_input(
         str(before_file),
         'PROD.TABLE',
         warehouse='snowflake'
     )
-    
+
     assert input_type == InputType.DATABASE
     assert metadata['warehouse'] == 'snowflake'
 
@@ -114,13 +114,13 @@ def test_resolve_warehouse_parameter_persists(tmp_path):
     after_file = tmp_path / "after.json"
     before_file.write_text('[]')
     after_file.write_text('[]')
-    
+
     _, metadata = resolve_input(
         str(before_file),
         str(after_file),
         warehouse='databricks'
     )
-    
+
     assert metadata['warehouse'] == 'databricks'
 
 
@@ -130,9 +130,9 @@ def test_resolve_sql_to_sql(tmp_path):
     after_file = tmp_path / "after.sql"
     before_file.write_text('CREATE TABLE t1 (id INT);')
     after_file.write_text('CREATE TABLE t1 (id INT, name VARCHAR);')
-    
+
     input_type, metadata = resolve_input(str(before_file), str(after_file))
-    
+
     assert input_type == InputType.SQL
     assert metadata['before_format'] == 'sql'
     assert metadata['after_format'] == 'sql'

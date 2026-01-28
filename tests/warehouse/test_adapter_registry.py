@@ -33,7 +33,7 @@ def test_get_unsupported_warehouse():
 
 def test_get_databricks_not_implemented():
     """Test that Databricks adapter is not yet implemented."""
-    with pytest.raises(WarehouseNotImplementedError, 
+    with pytest.raises(WarehouseNotImplementedError,
                       match="not yet implemented"):
         get_adapter('databricks')
 
