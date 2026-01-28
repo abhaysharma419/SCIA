@@ -22,8 +22,8 @@ def render_markdown(assessment: RiskAssessment) -> str:
                 emoji = "🟡"
             else:
                 emoji = "🟢"
-            lines.append(f"### {emoji} {finding.finding_type}")
-            lines.append(f"- **Severity:** {finding.severity}")
+            lines.append(f"### {emoji} {finding.finding_type.value}")
+            lines.append(f"- **Severity:** {finding.severity.value}")
             lines.append(f"- **Description:** {finding.description}")
             lines.append(f"- **Evidence:** `{finding.evidence}`")
             lines.append("")
