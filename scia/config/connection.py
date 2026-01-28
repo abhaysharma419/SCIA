@@ -43,11 +43,12 @@ def load_connection_config(
         return config
 
     # Try default location
-    default_path = Path.home() / '.scia' / f'{warehouse.lower()}.yaml'
-    if default_path.exists():
-        config = _load_yaml_config(str(default_path), warehouse)
-        logger.info("Loaded connection config from: %s", default_path)
-        return config
+    if warehouse:
+        default_path = Path.home() / '.scia' / f'{warehouse.lower()}.yaml'
+        if default_path.exists():
+            config = _load_yaml_config(str(default_path), warehouse)
+            logger.info("Loaded connection config from: %s", default_path)
+            return config
 
     # Try environment variables
     env_config = _load_from_env(warehouse)

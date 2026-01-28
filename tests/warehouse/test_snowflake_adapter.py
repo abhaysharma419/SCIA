@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scia.models.schema import ColumnSchema, TableSchema
 from scia.warehouse.snowflake import SnowflakeAdapter
 
 

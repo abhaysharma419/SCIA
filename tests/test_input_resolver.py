@@ -142,4 +142,4 @@ def test_resolve_invalid_combination():
     """Test unsupported input combinations."""
     # This would be if we had some hypothetical format
     # For now, test that valid combinations work
-    pass
+    assert True

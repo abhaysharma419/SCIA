@@ -123,8 +123,10 @@ def _detect_format(input_str: str) -> str:
                 return 'database'
 
     # Check if it's a file path (with or without extension)
-    if os.path.exists(input_str) or os.path.exists(input_str + '.json') or \
-       os.path.exists(input_str + '.sql'):
+    file_exists = (os.path.exists(input_str) or
+                   os.path.exists(input_str + '.json') or
+                   os.path.exists(input_str + '.sql'))
+    if file_exists:
         # It's a file, but we need extension to determine type
         if os.path.exists(input_str):
             path = Path(input_str)
@@ -134,12 +136,8 @@ def _detect_format(input_str: str) -> str:
                 return 'sql'
         return 'json'  # Default to json if no extension and file exists
 
-    # Default assumption: if not a file, assume database reference
-    if '.' in input_str:
-        return 'database'
-
-    # Fallback: treat as file path
-    return 'json'
+    # Default: if contains dot, assume database reference, else file path
+    return 'database' if '.' in input_str else 'json'
 
 
 def _is_valid_identifier(name: str) -> bool:

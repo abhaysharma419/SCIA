@@ -1,7 +1,6 @@
 """Tests for DDL parser."""
 import pytest
 
-from scia.models.schema import ColumnSchema, TableSchema
 from scia.sql.ddl_parser import (
     extract_table_references,
     parse_ddl_to_schema,
@@ -82,7 +81,7 @@ def test_parse_multiple_create_tables():
 def test_parse_empty_ddl():
     """Test parsing empty DDL string."""
     schemas = parse_ddl_to_schema("")
-    assert schemas == []
+    assert not schemas
 
 
 def test_parse_invalid_ddl():
