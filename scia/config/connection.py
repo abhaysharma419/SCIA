@@ -25,8 +25,8 @@ def load_connection_config(
     3. Sensible defaults if none provided
 
     Args:
-        warehouse: Warehouse type (snowflake, databricks, postgres, redshift)
         conn_file: Optional explicit connection file path
+        warehouse: Warehouse type (snowflake, databricks, postgres, redshift)
 
     Returns:
         Dictionary with connection configuration
