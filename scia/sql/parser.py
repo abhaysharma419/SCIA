@@ -17,6 +17,35 @@ class SQLMetadata:  # pylint: disable=too-few-public-methods
         self.join_keys: List[tuple] = []
         self.group_by_cols: Set[str] = set()
 
+def _extract_metadata(expression: exp.Expression, metadata: SQLMetadata):
+    """Internal helper to extract metadata from a single expression."""
+    # Extract tables
+    for table in expression.find_all(exp.Table):
+        metadata.tables.add(table.name.upper())
+
+    # Extract columns
+    for column in expression.find_all(exp.Column):
+        metadata.columns.add(column.name.upper())
+
+    # Extract group by columns
+    for group in expression.find_all(exp.Group):
+        for col in group.find_all(exp.Column):
+            metadata.group_by_cols.add(col.name.upper())
+
+    # Extract join keys (simplified for v0.1)
+    for join in expression.find_all(exp.Join):
+        _extract_join_keys(join, metadata)
+
+def _extract_join_keys(join: exp.Join, metadata: SQLMetadata):
+    """Internal helper to extract join keys from a join expression."""
+    on_clause = join.args.get("on")
+    if not on_clause:
+        return
+    for eq_expr in on_clause.find_all(exp.EQ):
+        cols = [c.name.upper() for c in eq_expr.find_all(exp.Column)]
+        if len(cols) == 2:
+            metadata.join_keys.append(tuple(cols))
+
 def parse_sql(sql: str) -> Optional[SQLMetadata]:
     """Best-effort SQL parsing for structural signals.
 
@@ -26,32 +55,8 @@ def parse_sql(sql: str) -> Optional[SQLMetadata]:
         metadata = SQLMetadata()
         # Using snowflake dialect as default for v0.1
         for expression in sqlglot.parse(sql, read="snowflake"):
-            if not expression:
-                continue
-
-            # Extract tables
-            for table in expression.find_all(exp.Table):
-                metadata.tables.add(table.name.upper())
-
-            # Extract columns
-            for column in expression.find_all(exp.Column):
-                metadata.columns.add(column.name.upper())
-
-            # Extract group by columns
-            for group in expression.find_all(exp.Group):  # pylint: disable=too-many-nested-blocks
-                for col in group.find_all(exp.Column):
-                    metadata.group_by_cols.add(col.name.upper())
-
-            # Extract join keys (simplified for v0.1)
-            for join in expression.find_all(exp.Join):
-                on_clause = join.args.get("on")
-                if on_clause:
-                    for eq in on_clause.find_all(exp.EQ):
-                        cols = [c.name.upper()
-                                for c in eq.find_all(exp.Column)]
-                        if len(cols) == 2:
-                            metadata.join_keys.append(tuple(cols))
-
+            if expression:
+                _extract_metadata(expression, metadata)
         return metadata
     except (AttributeError, ValueError, TypeError) as e:
         logger.warning("SQL parsing failed: %s", e)

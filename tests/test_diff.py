@@ -11,10 +11,10 @@ def test_column_addition(table_factory, column_factory):
     """Test detection of added columns."""
     col1 = column_factory(column_name="C1")
     col2 = column_factory(column_name="C2")
-    
+
     table_before = table_factory(columns=[col1])
     table_after = table_factory(columns=[col1, col2])
-    
+
     diff = diff_schemas([table_before], [table_after])
     assert len(diff.column_changes) == 1
     assert diff.column_changes[0].change_type == 'ADDED'
@@ -64,7 +64,7 @@ def test_nullability_change(table_factory, column_factory):
 def test_table_addition(table_factory):
     """Test detection of added tables."""
     table = table_factory(table_name="NEW_TABLE")
-    
+
     diff = diff_schemas([], [table])
     assert len(diff.column_changes) == 1
     assert diff.column_changes[0].table_name == "NEW_TABLE"
@@ -73,7 +73,7 @@ def test_table_addition(table_factory):
 def test_table_removal(table_factory):
     """Test detection of removed tables."""
     table = table_factory(table_name="OLD_TABLE")
-    
+
     diff = diff_schemas([table], [])
     assert len(diff.column_changes) == 1
     assert diff.column_changes[0].table_name == "OLD_TABLE"
@@ -84,15 +84,15 @@ def test_multiple_changes(table_factory, column_factory):
     col1_before = column_factory(table_name="T1", column_name="C1", data_type="INT")
     col1_after = column_factory(table_name="T1", column_name="C1", data_type="STRING")
     col2 = column_factory(table_name="T1", column_name="C2")
-    
+
     table1_before = table_factory(table_name="T1", columns=[col1_before])
     table1_after = table_factory(table_name="T1", columns=[col1_after, col2])
-    
+
     table2_before = table_factory(table_name="T2")
     # table2 removed in after
-    
+
     diff = diff_schemas([table1_before, table2_before], [table1_after])
-    
+
     # Changes:
     # 1. T1.C1 type change
     # 2. T1.C2 added
