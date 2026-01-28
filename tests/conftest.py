@@ -1,15 +1,19 @@
-import pytest
+"""Common test fixtures."""
+# pylint: disable=redefined-outer-name,too-many-arguments,too-many-positional-arguments
 from pathlib import Path
+import pytest
 from scia.models.schema import ColumnSchema, TableSchema
 from scia.models.finding import Finding, FindingType, Severity
-from scia.core.diff import SchemaDiff, ColumnDiff
+from scia.core.diff import SchemaDiff
 
 @pytest.fixture
 def fixtures_dir():
+    """Fixture for the directory containing test data files."""
     return Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def column_factory():
+    """Factory to create ColumnSchema instances for testing."""
     def _make_column(
         schema_name="PUBLIC",
         table_name="TEST_TABLE",
@@ -30,6 +34,7 @@ def column_factory():
 
 @pytest.fixture
 def table_factory(column_factory):
+    """Factory to create TableSchema instances for testing."""
     def _make_table(
         schema_name="PUBLIC",
         table_name="TEST_TABLE",
@@ -46,6 +51,7 @@ def table_factory(column_factory):
 
 @pytest.fixture
 def finding_factory():
+    """Factory to create Finding instances for testing."""
     def _make_finding(
         finding_type=FindingType.COLUMN_REMOVED,
         severity=Severity.HIGH,
@@ -66,6 +72,7 @@ def finding_factory():
 
 @pytest.fixture
 def schema_diff_factory():
+    """Factory to create SchemaDiff instances for testing."""
     def _make_diff(column_changes=None):
         if column_changes is None:
             column_changes = []

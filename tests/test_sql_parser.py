@@ -1,6 +1,8 @@
+"""Tests for test_sql_parser."""
 from scia.sql.parser import parse_sql
 
 def test_parse_sql_tables_and_columns():
+    """Test function."""
     sql = "SELECT id, name FROM users"
     metadata = parse_sql(sql)
     assert "USERS" in metadata.tables
@@ -8,15 +10,17 @@ def test_parse_sql_tables_and_columns():
     assert "NAME" in metadata.columns
 
 def test_parse_sql_group_by():
+    """Test function."""
     sql = "SELECT department, count(*) FROM employees GROUP BY department"
     metadata = parse_sql(sql)
     assert "EMPLOYEES" in metadata.tables
     assert "DEPARTMENT" in metadata.group_by_cols
 
 def test_parse_sql_join():
+    """Test function."""
     sql = """
-    SELECT o.id, c.name 
-    FROM orders o 
+    SELECT o.id, c.name
+    FROM orders o
     JOIN customers c ON o.customer_id = c.id
     """
     metadata = parse_sql(sql)
@@ -26,6 +30,7 @@ def test_parse_sql_join():
     assert ("CUSTOMER_ID", "ID") in metadata.join_keys or ("ID", "CUSTOMER_ID") in metadata.join_keys
 
 def test_parse_sql_invalid():
+    """Test function."""
     sql = "INVALID SQL"
     # sqlglot might still parse something or return empty list
     metadata = parse_sql(sql)
@@ -33,6 +38,7 @@ def test_parse_sql_invalid():
     assert metadata is not None or metadata is None # Depends on sqlglot result
 
 def test_parse_sql_failure():
+    """Test function."""
     # Passing None should trigger TypeError in sqlglot.parse and be caught
     metadata = parse_sql(None)
     assert metadata is None
