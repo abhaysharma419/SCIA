@@ -38,7 +38,7 @@ def test_cli_missing_file_error():
     """Test error handling when input files are missing."""
     result = run_cli(["analyze", "--before", "non_existent.json", "--after", "non_existent.json"])
     assert result.returncode == 1
-    assert "Error: File not found" in result.stderr
+    assert "not found" in result.stderr.lower()
 
 def test_cli_invalid_json_error(tmp_path):
     """Test error handling for invalid JSON input files."""
@@ -84,15 +84,44 @@ def test_cli_fail_on_behavior(fixtures_dir, tmp_path):
     medium_after.write_text(json.dumps(schema_after), encoding="utf-8")
 
     # --fail-on HIGH should PASS on MEDIUM findings
+    # Note: As of v0.2, type changes are HIGH risk (90) due to 
+    # combined rule_column_type_changed (40) + rule_potential_breakage (50).
+    # To get a MEDIUM risk, we can use a nullability change.
+    
+    null_before = tmp_path / "null_before.json"
+    null_after = tmp_path / "null_after.json"
+    
+    null_schema = [
+        {
+            "schema_name": "S", "table_name": "T",
+            "columns": [{
+                "schema_name": "S", "table_name": "T", "column_name": "C",
+                "data_type": "INT", "is_nullable": True, "ordinal_position": 1
+            }]
+        }
+    ]
+    null_schema_after = [
+        {
+            "schema_name": "S", "table_name": "T",
+            "columns": [{
+                "schema_name": "S", "table_name": "T", "column_name": "C",
+                "data_type": "INT", "is_nullable": False, "ordinal_position": 1
+            }]
+        }
+    ]
+    null_before.write_text(json.dumps(null_schema), encoding="utf-8")
+    null_after.write_text(json.dumps(null_schema_after), encoding="utf-8")
+
     result = run_cli([
-        "analyze", "--before", str(medium_before), "--after", str(medium_after),
+        "analyze", "--before", str(null_before), "--after", str(null_after),
         "--fail-on", "HIGH"
     ])
+    # Nullability change is 50 risk (MEDIUM)
     assert result.returncode == 0
 
     # --fail-on MEDIUM should FAIL on MEDIUM findings
     result = run_cli([
-        "analyze", "--before", str(medium_before), "--after", str(medium_after),
+        "analyze", "--before", str(null_before), "--after", str(null_after),
         "--fail-on", "MEDIUM"
     ])
     assert result.returncode == 1

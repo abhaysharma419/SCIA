@@ -58,6 +58,7 @@ class ImpactDetail(BaseModel):
 
     direct_dependents: List[DependencyObject] = []
     transitive_dependents: List[DependencyObject] = []
+    upstream_dependencies: List[DependencyObject] = []
     affected_applications: List[str] = []
     estimated_blast_radius: int = 0
 
