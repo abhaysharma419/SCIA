@@ -26,6 +26,23 @@ def render_markdown(assessment: RiskAssessment) -> str:
             lines.append(f"- **Severity:** {finding.severity.value}")
             lines.append(f"- **Description:** {finding.description}")
             lines.append(f"- **Evidence:** `{finding.evidence}`")
+
+            # Add Impact Detail if present (EnrichedFinding)
+            if hasattr(finding, 'impact_detail') and finding.impact_detail:
+                impact = finding.impact_detail
+                lines.append("")
+                lines.append("#### 📉 Downstream Impact")
+                if impact.direct_dependents:
+                    lines.append("| Object Type | Name | Schema | Critical |")
+                    lines.append("|-------------|------|--------|----------|")
+                    for dep in impact.direct_dependents:
+                        lines.append(
+                            f"| {dep.object_type} | {dep.name} | "
+                            f"{dep.schema_name} | {'Yes' if dep.is_critical else 'No'} |"
+                        )
+                else:
+                    lines.append("No direct downstream dependents identified.")
+                lines.append(f"- **Estimated Blast Radius:** {impact.estimated_blast_radius}")
             lines.append("")
 
     return "\n".join(lines)

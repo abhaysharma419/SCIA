@@ -7,7 +7,7 @@ SCIA analyzes SQL schema changes and tells you:
 - ✅ How risky it is (LOW/MEDIUM/HIGH)
 - ✅ Why it matters
 
-No catalog required. No vendor lock-in. Works with your existing warehouse metadata.
+Works with JSON exports, SQL migration files, or live warehouse connections.
 
 ---
 
@@ -67,8 +67,19 @@ Create two JSON files representing your schema before and after the change:
 
 ### 3. Run Analysis
 
+**JSON Mode (Offline):**
 ```bash
 scia analyze --before before_schema.json --after after_schema.json --format markdown
+```
+
+**SQL Mode (Migration Analysis):**
+```bash
+scia analyze --before base_schema.json --after migration.sql --format markdown
+```
+
+**Database Mode (Live):**
+```bash
+scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS --warehouse snowflake --format markdown
 ```
 
 ### 4. Get Risk Assessment
@@ -203,8 +214,11 @@ scia analyze --before <before.json> --after <after.json> [options]
 
 | Option | Required | Example | Description |
 |--------|----------|---------|-------------|
-| `--before` | ✅ | `before.json` | Original schema JSON |
-| `--after` | ✅ | `after.json` | Modified schema JSON |
+| `--before` | ✅ | `before.json` | Original schema (JSON, SQL, or SCHEMA.TABLE) |
+| `--after` | ✅ | `after.json` | Modified schema (JSON, SQL, or SCHEMA.TABLE) |
+| `--warehouse` | ❌ | `snowflake` | Warehouse type (required for DB mode) |
+| `--conn-file` | ❌ | `config.yaml` | Connection config file |
+| `--dependency-depth`| ❌ | `3` | Max depth for dependency analysis (1-10) |
 | `--format` | ❌ | `json` or `markdown` | Output format (default: json) |
 | `--fail-on` | ❌ | `HIGH` | Exit code 1 if risk meets threshold |
 
@@ -302,12 +316,13 @@ SCIA/
 
 ---
 
-## 🏗️ What SCIA Does (v0.1)
+## 🏗️ What SCIA Does (v0.2)
 
 **Detects:**
-- Column removal
-- Column type changes
-- Nullability changes
+- Column removal, type changes, nullability changes
+- **JOIN key breakage** (High Risk)
+- **GROUP BY grain changes** (Medium Risk)
+- **Downstream view breakage** (Transitive impact)
 
 **Scores risk as:**
 - **LOW** (<30) — Safe to deploy
@@ -315,8 +330,8 @@ SCIA/
 - **HIGH** (≥70) — Likely to break systems
 
 **Outputs:**
-- JSON (for CI/CD, tools)
-- Markdown (for humans)
+- JSON with `impact_detail`
+- Markdown with "Downstream Impact" tables
 
 ---
 
@@ -438,7 +453,7 @@ scia analyze --before base.json --after scenario2.json
 ## ❓ FAQ
 
 **Q: Can SCIA connect to my warehouse directly?**  
-A: Not yet (v0.1). Export schema as JSON first. Live connections planned for v0.2.
+A: Yes! As of v0.2, SCIA supports live connections to Snowflake (others as stubs). Use the `--warehouse` flag.
 
 **Q: Do I need dbt?**  
 A: No. SCIA works with plain SQL and warehouse metadata.
@@ -474,9 +489,9 @@ Apache 2.0 — See LICENSE file
 
 ## 🚀 What's Next?
 
-- **v0.1** (Current): Core schema diff, risk scoring, JSON-based analysis.
-- **v0.2**: SQL migration parsing, live warehouse connectivity (Snowflake), and downstream impact analysis.
-- **v0.3**: Advanced risk policies, incident pattern matching, and multi-warehouse support.
+- **v0.1** ✅: Core schema diff, risk scoring, JSON-based analysis.
+- **v0.2** ✅: SQL migration parsing, live warehouse connectivity (Snowflake), and downstream impact analysis.
+- **v0.3** 🏗️: Advanced risk policies, incident pattern matching, and multi-warehouse support.
 
 ---
 
