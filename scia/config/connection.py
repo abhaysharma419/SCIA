@@ -22,7 +22,8 @@ def load_connection_config(
     Loads configuration with the following priority:
     1. Explicit --conn-file path (highest priority)
     2. ~/.scia/{warehouse}.yaml
-    3. Sensible defaults if none provided
+    3. Environment variables
+    4. Sensible defaults merged with findings
 
     Args:
         warehouse: Warehouse type (snowflake, databricks, postgres, redshift)
@@ -34,31 +35,35 @@ def load_connection_config(
     Raises:
         ConnectionConfigError: If configuration file is invalid
     """
-    config = {}
+    # Start with defaults
+    config = _get_defaults(warehouse) if warehouse else {}
+    found_config = {}
+    source = "defaults"
 
     # Try explicit file first
     if conn_file:
-        config = _load_yaml_config(conn_file, warehouse)
-        logger.info("Loaded connection config from: %s", conn_file)
-        return config
-
-    # Try default location
-    if warehouse:
+        found_config = _load_yaml_config(conn_file, warehouse)
+        source = f"file: {conn_file}"
+    elif warehouse:
+        # Try default location
         default_path = Path.home() / '.scia' / f'{warehouse.lower()}.yaml'
         if default_path.exists():
-            config = _load_yaml_config(str(default_path), warehouse)
-            logger.info("Loaded connection config from: %s", default_path)
-            return config
+            found_config = _load_yaml_config(str(default_path), warehouse)
+            source = f"file: {default_path}"
+        else:
+            # Try environment variables
+            env_found = _load_from_env(warehouse)
+            if env_found:
+                found_config = env_found
+                source = "environment variables"
 
-    # Try environment variables
-    env_config = _load_from_env(warehouse)
-    if env_config:
-        logger.info("Loaded connection config from environment variables")
-        return env_config
+    if found_config:
+        config.update(found_config)
+        logger.info("Loaded connection config from %s", source)
+    else:
+        logger.warning("No connection config found for %s. Using defaults.", warehouse)
 
-    # Return empty config (will likely fail at connection time)
-    logger.warning("No connection config found for %s. Using defaults.", warehouse)
-    return _get_defaults(warehouse)
+    return config
 
 
 def _load_yaml_config(file_path: str, warehouse: str) -> Dict[str, Any]:
