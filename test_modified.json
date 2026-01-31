@@ -1,0 +1,24 @@
+[
+    {
+        "schema_name": "PUBLIC",
+        "table_name": "USERS",
+        "columns": [
+            {
+                "schema_name": "PUBLIC",
+                "table_name": "USERS",
+                "column_name": "USER_ID",
+                "data_type": "INT",
+                "is_nullable": false,
+                "ordinal_position": 1
+            },
+            {
+                "schema_name": "PUBLIC",
+                "table_name": "USERS",
+                "column_name": "USERNAME",
+                "data_type": "TEXT",
+                "is_nullable": false,
+                "ordinal_position": 2
+            }
+        ]
+    }
+]
