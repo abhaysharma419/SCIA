@@ -56,6 +56,12 @@ class SnowflakeAdapter(WarehouseAdapter):
         try:
             cursor = self.conn.cursor()
 
+            # Handle database qualification
+            from_clause = f"{database}.INFORMATION_SCHEMA.COLUMNS" if database else "INFORMATION_SCHEMA.COLUMNS"
+            
+            # Use provided schema or fall back to connection default if schema is empty
+            target_schema = schema.upper() if schema else "PUBLIC"
+
             # Fetch columns metadata from INFORMATION_SCHEMA
             query = f"""
             SELECT
@@ -65,8 +71,8 @@ class SnowflakeAdapter(WarehouseAdapter):
                 DATA_TYPE,
                 IS_NULLABLE,
                 ORDINAL_POSITION
-            FROM {database}.INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = '{schema.upper()}'
+            FROM {from_clause}
+            WHERE TABLE_SCHEMA = '{target_schema}'
             ORDER BY TABLE_NAME, ORDINAL_POSITION
             """
             cursor.execute(query)
@@ -119,10 +125,15 @@ class SnowflakeAdapter(WarehouseAdapter):
 
         try:
             cursor = self.conn.cursor()
+            
+            # Handle database qualification
+            from_clause = f"{database}.INFORMATION_SCHEMA.VIEWS" if database else "INFORMATION_SCHEMA.VIEWS"
+            target_schema = schema.upper() if schema else "PUBLIC"
+
             query = f"""
             SELECT TABLE_NAME, VIEW_DEFINITION
-            FROM {database}.INFORMATION_SCHEMA.VIEWS
-            WHERE TABLE_SCHEMA = '{schema.upper()}'
+            FROM {from_clause}
+            WHERE TABLE_SCHEMA = '{target_schema}'
             """
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -150,6 +161,11 @@ class SnowflakeAdapter(WarehouseAdapter):
 
         try:
             cursor = self.conn.cursor()
+            
+            # Handle database qualification
+            from_clause = f"{database}.INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" if database else "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS"
+            target_schema = schema.upper() if schema else "PUBLIC"
+
             query = f"""
             SELECT
                 CONSTRAINT_NAME,
@@ -157,8 +173,8 @@ class SnowflakeAdapter(WarehouseAdapter):
                 COLUMN_NAME,
                 REFERENCED_TABLE_NAME,
                 REFERENCED_COLUMN_NAME
-            FROM {database}.INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
-            WHERE CONSTRAINT_SCHEMA = '{schema.upper()}'
+            FROM {from_clause}
+            WHERE CONSTRAINT_SCHEMA = '{target_schema}'
             """
             cursor.execute(query)
             rows = cursor.fetchall()

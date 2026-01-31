@@ -19,5 +19,5 @@ def parse_identifier(identifier: str) -> Tuple[str, str, str]:
     if len(parts) == 3:
         return parts[0], parts[1], parts[2]
     if len(parts) == 2:
-        return "", parts[0], parts[1]
+        return parts[0], parts[1], ""
     return "", "", identifier
