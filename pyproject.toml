@@ -13,8 +13,12 @@ dependencies = [
     "snowflake-connector-python>=3.0.0",
     "sqlglot>=20.0.0",
     "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
     "PyYAML>=6.0.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [project.scripts]
 scia = "scia.cli.main:main"
