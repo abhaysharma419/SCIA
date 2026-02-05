@@ -113,9 +113,16 @@ def test_snowflake_adapter_fetch_views_no_connection(adapter):
 def test_snowflake_adapter_fetch_foreign_keys_success(adapter):
     """Test successful foreign keys fetch."""
     mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        ('FK_USER_ID', 'ORDERS', 'USER_ID', 'USERS', 'USER_ID'),
-    ]
+    # Mock result for SHOW IMPORTED KEYS
+    # Indices: 2=pk_table, 3=pk_column, 6=fk_table, 7=fk_column, 11=fk_name
+    row = [None] * 14
+    row[2] = 'USERS'
+    row[3] = 'USER_ID'
+    row[6] = 'ORDERS'
+    row[7] = 'USER_ID'
+    row[11] = 'FK_USER_ID'
+    
+    mock_cursor.fetchall.return_value = [row]
 
     mock_conn = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
@@ -148,6 +155,27 @@ def test_snowflake_adapter_parse_table_references_failure(adapter):
                side_effect=Exception("Parse error")):
         refs = adapter.parse_table_references('INVALID SQL')
         assert refs == []
+
+
+def test_snowflake_adapter_resolve_context(adapter):
+    """Test resolution of database and schema from Snowflake session."""
+    mock_cursor = MagicMock()
+    # First call for context resolution
+    mock_cursor.fetchone.return_value = ('MOCKED_DB', 'MOCKED_SCHEMA')
+    # Second call for the metadata query (e.g., SHOW IMPORTED KEYS)
+    mock_cursor.fetchall.return_value = []
+
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    adapter.conn = mock_conn
+
+    # Call with empty strings to trigger resolution
+    adapter.fetch_foreign_keys('', '')
+
+    # Verify context was fetched
+    mock_cursor.execute.assert_any_call("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()")
+    # Verify the metadata query used the resolved names
+    mock_cursor.execute.assert_any_call("SHOW IMPORTED KEYS IN SCHEMA MOCKED_DB.MOCKED_SCHEMA")
 
 
 def test_snowflake_adapter_close(adapter):
