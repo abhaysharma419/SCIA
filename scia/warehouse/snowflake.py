@@ -17,6 +17,22 @@ class SnowflakeAdapter(WarehouseAdapter):
         """Initialize Snowflake adapter."""
         self.conn = None
 
+    def _resolve_context(self, cursor, database: str, schema: str):
+        """Resolve database and schema names.
+        
+        If not provided, fetch current context from session.
+        """
+        target_database = database
+        target_schema = schema.upper() if schema else ""
+
+        if not target_database or not target_schema:
+            cursor.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()")
+            default_db, default_schema = cursor.fetchone()
+            target_database = target_database or default_db
+            target_schema = target_schema or (default_schema if default_schema else "PUBLIC")
+        
+        return target_database, target_schema
+
     def connect(self, config: Dict[str, Any]) -> None:
         """Establish connection to Snowflake warehouse.
 
@@ -56,11 +72,14 @@ class SnowflakeAdapter(WarehouseAdapter):
         try:
             cursor = self.conn.cursor()
 
-            # Handle database qualification
-            from_clause = f"{database}.INFORMATION_SCHEMA.COLUMNS" if database else "INFORMATION_SCHEMA.COLUMNS"
+            # Resolve database and schema names
+            target_database, target_schema = self._resolve_context(cursor, database, schema)
             
-            # Use provided schema or fall back to connection default if schema is empty
-            target_schema = schema.upper() if schema else "PUBLIC"
+            if not target_database:
+                logger.warning("No database specified or found for schema fetch.")
+                return []
+
+            from_clause = f"{target_database}.INFORMATION_SCHEMA.COLUMNS"
 
             # Fetch columns metadata from INFORMATION_SCHEMA
             query = f"""
@@ -126,9 +145,14 @@ class SnowflakeAdapter(WarehouseAdapter):
         try:
             cursor = self.conn.cursor()
             
-            # Handle database qualification
-            from_clause = f"{database}.INFORMATION_SCHEMA.VIEWS" if database else "INFORMATION_SCHEMA.VIEWS"
-            target_schema = schema.upper() if schema else "PUBLIC"
+            # Resolve database and schema names
+            target_database, target_schema = self._resolve_context(cursor, database, schema)
+            
+            if not target_database:
+                logger.warning("No database specified or found for views fetch.")
+                return {}
+
+            from_clause = f"{target_database}.INFORMATION_SCHEMA.VIEWS"
 
             query = f"""
             SELECT TABLE_NAME, VIEW_DEFINITION
@@ -162,31 +186,32 @@ class SnowflakeAdapter(WarehouseAdapter):
         try:
             cursor = self.conn.cursor()
             
-            # Handle database qualification
-            from_clause = f"{database}.INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" if database else "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS"
-            target_schema = schema.upper() if schema else "PUBLIC"
+            # Resolve database and schema names
+            target_database, target_schema = self._resolve_context(cursor, database, schema)
 
-            query = f"""
-            SELECT
-                CONSTRAINT_NAME,
-                TABLE_NAME,
-                COLUMN_NAME,
-                REFERENCED_TABLE_NAME,
-                REFERENCED_COLUMN_NAME
-            FROM {from_clause}
-            WHERE CONSTRAINT_SCHEMA = '{target_schema}'
-            """
+            if not target_database:
+                logger.warning("No database specified or found for foreign key fetch.")
+                return []
+            
+            # In Snowflake, SHOW IMPORTED KEYS IN SCHEMA <db>.<schema> is the most reliable way 
+            # to get foreign keys with their respective columns.
+            query = f"SHOW IMPORTED KEYS IN SCHEMA {target_database}.{target_schema}"
+
+            logger.debug("Executing foreign key query: %s", query)
             cursor.execute(query)
+            
+            # Fetch all rows and map them to the expected format
+            # Column indices for SHOW IMPORTED KEYS:
+            # 2: pk_table_name, 3: pk_column_name, 6: fk_table_name, 7: fk_column_name, 11: fk_name
             rows = cursor.fetchall()
-
             result = []
             for row in rows:
                 result.append({
-                    'constraint_name': row[0],
-                    'table_name': row[1],
-                    'column_name': row[2],
-                    'referenced_table': row[3],
-                    'referenced_column': row[4]
+                    'constraint_name': row[11],
+                    'table_name': row[6],
+                    'column_name': row[7],
+                    'referenced_table': row[2],
+                    'referenced_column': row[3]
                 })
 
             logger.info("Fetched %d foreign keys from %s.%s", len(result), database, schema)
