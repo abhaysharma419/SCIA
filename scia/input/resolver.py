@@ -97,46 +97,33 @@ def resolve_input(
 
 
 def _detect_format(input_str: str) -> str:
-    """Detect format of an input string.
-
-    Args:
-        input_str: Input string (file path or database reference)
-
-    Returns:
-        'json', 'sql', or 'database'
-    """
+    """Detect format of an input string."""
     input_lower = input_str.lower()
+    detected = None
 
     # Check for file extensions
     if input_lower.endswith('.json'):
-        return 'json'
-    if input_lower.endswith('.sql'):
-        return 'sql'
+        detected = 'json'
+    elif input_lower.endswith('.sql'):
+        detected = 'sql'
+
+    if detected:
+        return detected
 
     # Check for database references (SCHEMA.TABLE or DATABASE.SCHEMA.TABLE)
     if '.' in input_str and not input_str.startswith('.'):
-        # Might be a database reference
         parts = input_str.split('.')
-        if len(parts) in (2, 3):  # schema.table or database.schema.table
-            # Verify parts look like identifiers (alphanumeric + underscore)
-            if all(_is_valid_identifier(part) for part in parts):
-                return 'database'
+        if len(parts) in (2, 3) and all(_is_valid_identifier(part) for part in parts):
+            return 'database'
 
     # Check if it's a file path (with or without extension)
-    file_exists = (os.path.exists(input_str) or
-                   os.path.exists(input_str + '.json') or
-                   os.path.exists(input_str + '.sql'))
-    if file_exists:
-        # It's a file, but we need extension to determine type
-        if os.path.exists(input_str):
-            path = Path(input_str)
-            if path.suffix.lower() == '.json':
-                return 'json'
-            if path.suffix.lower() == '.sql':
-                return 'sql'
-        return 'json'  # Default to json if no extension and file exists
+    if os.path.exists(input_str):
+        path = Path(input_str)
+        if path.suffix.lower() == '.sql':
+            return 'sql'
+        return 'json'  # Default to json if invalid ext or no ext
 
-    # Default: if contains dot, assume database reference, else file path
+    # Default fallback
     return 'database' if '.' in input_str else 'json'
 
 
