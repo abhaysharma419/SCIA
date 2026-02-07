@@ -1,125 +1,155 @@
 """Schema diffing and change detection."""
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel
 
 from scia.models.schema import ColumnSchema, TableSchema
 
-class ColumnDiff(BaseModel):
-    """Represents a single column change between schema versions."""
+class SchemaChange(BaseModel):
+    """Represents a change between schema versions at any level (Schema, Table, Column)."""
 
+    object_type: str  # 'SCHEMA', 'TABLE', 'COLUMN'
     schema_name: str
-    table_name: str
-    column_name: str
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
     change_type: str  # 'ADDED', 'REMOVED', 'TYPE_CHANGED', 'NULLABILITY_CHANGED'
-    before: Optional[ColumnSchema] = None
-    after: Optional[ColumnSchema] = None
+    before: Any = None
+    after: Any = None
 
 class SchemaDiff(BaseModel):
-    """Collection of all column changes between two schemas."""
+    """Collection of all changes between two schemas."""
 
-    column_changes: List[ColumnDiff] = []
+    changes: List[SchemaChange] = []
 
 
 def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaDiff:
-    """Compare two schema lists and identify column changes.
+    """Compare two schema lists and identify changes hierarchically.
 
     Args:
         before: Original schema definitions
         after: Modified schema definitions
 
     Returns:
-        SchemaDiff containing all detected column changes
+        SchemaDiff containing all detected changes
     """
-    column_changes = []
+    all_changes = []
 
-    # Map tables by name for easy lookup
-    before_map = {t.table_name: t for t in before}
-    after_map = {t.table_name: t for t in after}
+    # Group tables by schema for hierarchy
+    before_schemas = {}
+    for t in before:
+        before_schemas.setdefault(t.schema_name, []).append(t)
+    
+    after_schemas = {}
+    for t in after:
+        after_schemas.setdefault(t.schema_name, []).append(t)
 
-    for table_name in set(before_map.keys()) | set(after_map.keys()):
-        _process_table_diff(table_name, before_map, after_map, column_changes)
+    # 1. Schema Level Comparison
+    all_schema_names = set(before_schemas.keys()) | set(after_schemas.keys())
+    
+    for schema_name in all_schema_names:
+        b_tables = before_schemas.get(schema_name)
+        a_tables = after_schemas.get(schema_name)
 
-    return SchemaDiff(column_changes=column_changes)
+        if b_tables and not a_tables:
+            all_changes.append(SchemaChange(
+                object_type='SCHEMA',
+                schema_name=schema_name,
+                change_type='REMOVED'
+            ))
+            continue
+        
+        if not b_tables and a_tables:
+            all_changes.append(SchemaChange(
+                object_type='SCHEMA',
+                schema_name=schema_name,
+                change_type='ADDED'
+            ))
+            continue
 
-def _process_table_diff(table_name: str, before_map: dict, after_map: dict,
-                       changes: list) -> None:
-    """Process changes for a single table."""
-    before_table = before_map.get(table_name)
-    after_table = after_map.get(table_name)
+        # 2. Table Level Comparison (if schema exists in both)
+        before_table_map = {t.table_name: t for t in b_tables}
+        after_table_map = {t.table_name: t for t in a_tables}
+        
+        all_table_names = set(before_table_map.keys()) | set(after_table_map.keys())
+        
+        for table_name in all_table_names:
+            b_table = before_table_map.get(table_name)
+            a_table = after_table_map.get(table_name)
 
-    # If table is removed, all its columns are removed
-    if before_table and not after_table:
-        for col in before_table.columns:
-            changes.append(ColumnDiff(
-                schema_name=col.schema_name,
+            if b_table and not a_table:
+                all_changes.append(SchemaChange(
+                    object_type='TABLE',
+                    schema_name=schema_name,
+                    table_name=table_name,
+                    change_type='REMOVED'
+                ))
+                continue
+            
+            if not b_table and a_table:
+                all_changes.append(SchemaChange(
+                    object_type='TABLE',
+                    schema_name=schema_name,
+                    table_name=table_name,
+                    change_type='ADDED'
+                ))
+                continue
+
+            # 3. Column Level Comparison (if table exists in both)
+            _process_column_level_diff(schema_name, table_name, b_table, a_table, all_changes)
+
+    return SchemaDiff(changes=all_changes)
+
+def _process_column_level_diff(schema_name: str, table_name: str, 
+                             before_table: TableSchema, after_table: TableSchema,
+                             changes: list) -> None:
+    """Compare columns within a table that exists in both versions."""
+    before_cols = {c.column_name: c for c in before_table.columns}
+    after_cols = {c.column_name: c for c in after_table.columns}
+
+    all_col_names = set(before_cols.keys()) | set(after_cols.keys())
+
+    for col_name in all_col_names:
+        b_col = before_cols.get(col_name)
+        a_col = after_cols.get(col_name)
+
+        if b_col and not a_col:
+            changes.append(SchemaChange(
+                object_type='COLUMN',
+                schema_name=schema_name,
                 table_name=table_name,
-                column_name=col.column_name,
+                column_name=col_name,
                 change_type='REMOVED',
-                before=col
+                before=b_col
             ))
-        return
-
-    # If table is added, all its columns are added
-    if not before_table and after_table:
-        for col in after_table.columns:
-            changes.append(ColumnDiff(
-                schema_name=col.schema_name,
+        elif not b_col and a_col:
+            changes.append(SchemaChange(
+                object_type='COLUMN',
+                schema_name=schema_name,
                 table_name=table_name,
-                column_name=col.column_name,
+                column_name=col_name,
                 change_type='ADDED',
-                after=col
+                after=a_col
             ))
-        return
-
-    # Table exists in both, compare columns
-    if before_table and after_table:
-        before_cols = {c.column_name: c for c in before_table.columns}
-        after_cols = {c.column_name: c for c in after_table.columns}
-
-        for col_name in set(before_cols.keys()) | set(after_cols.keys()):
-            _process_col_diff(col_name, table_name, before_cols,
-                            after_cols, changes)
-
-def _process_col_diff(col_name: str, table_name: str, before_cols: dict,
-                     after_cols: dict, changes: list) -> None:
-    """Process changes for a single column."""
-    b_col = before_cols.get(col_name)
-    a_col = after_cols.get(col_name)
-
-    if b_col and not a_col:
-        changes.append(ColumnDiff(
-            schema_name=b_col.schema_name,
-            table_name=table_name,
-            column_name=col_name,
-            change_type='REMOVED',
-            before=b_col
-        ))
-    elif not b_col and a_col:
-        changes.append(ColumnDiff(
-            schema_name=a_col.schema_name,
-            table_name=table_name,
-            column_name=col_name,
-            change_type='ADDED',
-            after=a_col
-        ))
-    elif b_col and a_col and b_col.data_type != a_col.data_type:
-        # Type changed
-        changes.append(ColumnDiff(
-            schema_name=b_col.schema_name,
-            table_name=table_name,
-            column_name=col_name,
-            change_type='TYPE_CHANGED',
-            before=b_col,
-            after=a_col
-        ))
-    elif b_col and a_col and b_col.is_nullable != a_col.is_nullable:
-        # Nullability changed
-        changes.append(ColumnDiff(
-            schema_name=b_col.schema_name,
-            table_name=table_name,
-            column_name=col_name,
-            change_type='NULLABILITY_CHANGED',
-            before=b_col,
-            after=a_col
-        ))
+        elif b_col and a_col:
+            # Check for type change
+            if b_col.data_type != a_col.data_type:
+                changes.append(SchemaChange(
+                    object_type='COLUMN',
+                    schema_name=schema_name,
+                    table_name=table_name,
+                    column_name=col_name,
+                    change_type='TYPE_CHANGED',
+                    before=b_col,
+                    after=a_col
+                ))
+            # Check for nullability change
+            elif b_col.is_nullable != a_col.is_nullable:
+                changes.append(SchemaChange(
+                    object_type='COLUMN',
+                    schema_name=schema_name,
+                    table_name=table_name,
+                    column_name=col_name,
+                    change_type='NULLABILITY_CHANGED',
+                    before=b_col,
+                    after=a_col
+                ))

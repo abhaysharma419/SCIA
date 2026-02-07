@@ -115,7 +115,7 @@ class SnowflakeAdapter(WarehouseAdapter):
             result = []
             for table_name, columns in tables_data.items():
                 result.append(TableSchema(
-                    schema_name=schema,
+                    schema_name=target_schema,
                     table_name=table_name,
                     columns=columns
                 ))

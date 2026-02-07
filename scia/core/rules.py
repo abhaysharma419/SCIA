@@ -4,11 +4,67 @@ from typing import Any, Dict, List, Optional
 from scia.core.diff import SchemaDiff
 from scia.models.finding import Finding, FindingType, Severity
 
+def rule_schema_removed(diff: SchemaDiff) -> List[Finding]:
+    """Detect removed schemas."""
+    findings = []
+    for change in diff.changes:
+        if change.object_type == 'SCHEMA' and change.change_type == 'REMOVED':
+            findings.append(Finding(
+                finding_type=FindingType.SCHEMA_REMOVED,
+                severity=Severity.HIGH,
+                base_risk=100,
+                evidence={"schema": change.schema_name},
+                description=f"Schema '{change.schema_name}' was removed."
+            ))
+    return findings
+
+def rule_schema_added(diff: SchemaDiff) -> List[Finding]:
+    """Detect added schemas."""
+    findings = []
+    for change in diff.changes:
+        if change.object_type == 'SCHEMA' and change.change_type == 'ADDED':
+            findings.append(Finding(
+                finding_type=FindingType.SCHEMA_ADDED,
+                severity=Severity.LOW,
+                base_risk=0,
+                evidence={"schema": change.schema_name},
+                description=f"New schema '{change.schema_name}' was added."
+            ))
+    return findings
+
+def rule_table_removed(diff: SchemaDiff) -> List[Finding]:
+    """Detect removed tables."""
+    findings = []
+    for change in diff.changes:
+        if change.object_type == 'TABLE' and change.change_type == 'REMOVED':
+            findings.append(Finding(
+                finding_type=FindingType.TABLE_REMOVED,
+                severity=Severity.HIGH,
+                base_risk=90,
+                evidence={"schema": change.schema_name, "table": change.table_name},
+                description=f"Table '{change.table_name}' was removed from schema '{change.schema_name}'."
+            ))
+    return findings
+
+def rule_table_added(diff: SchemaDiff) -> List[Finding]:
+    """Detect added tables."""
+    findings = []
+    for change in diff.changes:
+        if change.object_type == 'TABLE' and change.change_type == 'ADDED':
+            findings.append(Finding(
+                finding_type=FindingType.TABLE_ADDED,
+                severity=Severity.LOW,
+                base_risk=0,
+                evidence={"schema": change.schema_name, "table": change.table_name},
+                description=f"New table '{change.table_name}' was added to schema '{change.schema_name}'."
+            ))
+    return findings
+
 def rule_column_removed(diff: SchemaDiff) -> List[Finding]:
     """Detect removed columns."""
     findings = []
-    for change in diff.column_changes:
-        if change.change_type == 'REMOVED':
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.change_type == 'REMOVED':
             findings.append(Finding(
                 finding_type=FindingType.COLUMN_REMOVED,
                 severity=Severity.HIGH,
@@ -21,11 +77,28 @@ def rule_column_removed(diff: SchemaDiff) -> List[Finding]:
             ))
     return findings
 
+def rule_column_added(diff: SchemaDiff) -> List[Finding]:
+    """Detect added columns."""
+    findings = []
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.change_type == 'ADDED':
+            findings.append(Finding(
+                finding_type=FindingType.COLUMN_ADDED,
+                severity=Severity.LOW,
+                base_risk=0,
+                evidence={"table": change.table_name, "column": change.column_name},
+                description=(
+                    f"New column '{change.column_name}' added to table "
+                    f"'{change.table_name}'."
+                )
+            ))
+    return findings
+
 def rule_column_type_changed(diff: SchemaDiff) -> List[Finding]:
     """Detect column type changes."""
     findings = []
-    for change in diff.column_changes:
-        if change.change_type == 'TYPE_CHANGED':
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.change_type == 'TYPE_CHANGED':
             findings.append(Finding(
                 finding_type=FindingType.COLUMN_TYPE_CHANGED,
                 severity=Severity.MEDIUM,
@@ -46,8 +119,8 @@ def rule_column_type_changed(diff: SchemaDiff) -> List[Finding]:
 def rule_nullability_changed(diff: SchemaDiff) -> List[Finding]:
     """Detect nullability constraint changes."""
     findings = []
-    for change in diff.column_changes:
-        if change.change_type == 'NULLABILITY_CHANGED':
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.change_type == 'NULLABILITY_CHANGED':
             # Changing from nullable to NOT NULL is risky
             if change.before.is_nullable and not change.after.is_nullable:
                 findings.append(Finding(
@@ -73,7 +146,6 @@ def rule_join_key_changed(diff: SchemaDiff,
         return findings
 
     # Collect all join keys across all signals
-    # sql_signals is Dict[str, SQLMetadata]
     joining_columns = set()
     for metadata in sql_signals.values():
         if hasattr(metadata, 'join_keys'):
@@ -81,8 +153,8 @@ def rule_join_key_changed(diff: SchemaDiff,
                 for col in key_pair:
                     joining_columns.add(col.upper())
 
-    for change in diff.column_changes:
-        if change.column_name.upper() in joining_columns:
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.column_name.upper() in joining_columns:
             if change.change_type in ('REMOVED', 'TYPE_CHANGED'):
                 findings.append(Finding(
                     finding_type=FindingType.JOIN_KEY_CHANGED,
@@ -114,8 +186,9 @@ def rule_grain_change(diff: SchemaDiff,
             for col in metadata.group_by_cols:
                 grouping_columns.add(col.upper())
 
-    for change in diff.column_changes:
-        if (change.change_type == 'REMOVED' and
+    for change in diff.changes:
+        if (change.object_type == 'COLUMN' and 
+            change.change_type == 'REMOVED' and
             change.column_name.upper() in grouping_columns):
             findings.append(Finding(
                 finding_type=FindingType.GRAIN_CHANGE,
@@ -134,7 +207,7 @@ def rule_grain_change(diff: SchemaDiff,
     return findings
 
 def rule_potential_breakage(diff: SchemaDiff,
-                            sql_signals: Optional[Dict[str, Any]] = None) -> List[Finding]:
+                             sql_signals: Optional[Dict[str, Any]] = None) -> List[Finding]:
     """Catch-all for complex changes. MEDIUM severity."""
     findings = []
     referenced_columns = set()
@@ -144,8 +217,8 @@ def rule_potential_breakage(diff: SchemaDiff,
                 for col in metadata.columns:
                     referenced_columns.add(col.upper())
 
-    for change in diff.column_changes:
-        if change.change_type == 'TYPE_CHANGED':
+    for change in diff.changes:
+        if change.object_type == 'COLUMN' and change.change_type == 'TYPE_CHANGED':
             # If we have SQL signals, only flag if the column is actually referenced
             if not sql_signals or change.column_name.upper() in referenced_columns:
                 findings.append(Finding(
@@ -167,7 +240,12 @@ def rule_potential_breakage(diff: SchemaDiff,
     return findings
 
 ALL_RULES = [
+    rule_schema_removed,
+    rule_schema_added,
+    rule_table_removed,
+    rule_table_added,
     rule_column_removed,
+    rule_column_added,
     rule_column_type_changed,
     rule_nullability_changed,
     rule_join_key_changed,
