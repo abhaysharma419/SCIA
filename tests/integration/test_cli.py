@@ -32,7 +32,7 @@ def test_cli_markdown_output(fixtures_dir):
     result = run_cli(["analyze", "--before", before, "--after", after, "--format", "markdown"])
     assert result.returncode == 1
     assert "# SCIA Impact Report" in result.stdout
-    assert "**Risk Score:**" in result.stdout
+    assert "**Overall Risk Score:**" in result.stdout
 
 def test_cli_missing_file_error():
     """Test error handling when input files are missing."""

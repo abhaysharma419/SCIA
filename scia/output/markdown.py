@@ -5,7 +5,7 @@ def render_markdown(assessment: RiskAssessment) -> str:
     """Render risk assessment as Markdown report."""
     lines = [
         "# SCIA Impact Report",
-        f"**Risk Score:** {assessment.risk_score}",
+        f"**Overall Risk Score:** {assessment.risk_score}/100",
         f"**Classification:** {assessment.classification}",
         ""
     ]
@@ -31,7 +31,7 @@ def render_markdown(assessment: RiskAssessment) -> str:
                 emoji = "🟡"
             else:
                 emoji = "🟢"
-            lines.append(f"### {emoji} {finding.finding_type.value}")
+            lines.append(f"### {emoji} {finding.finding_type.value} (Score: {finding.risk_score})")
             lines.append(f"- **Severity:** {finding.severity.value}")
             lines.append(f"- **Description:** {finding.description}")
             lines.append(f"- **Evidence:** `{finding.evidence}`")

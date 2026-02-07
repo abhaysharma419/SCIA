@@ -32,9 +32,14 @@ class Finding(BaseModel):
     finding_type: FindingType
     severity: Severity
     base_risk: int
+    risk_score: Optional[int] = None
     evidence: Dict[str, Any]
     confidence: Optional[float] = 1.0
     description: str
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.risk_score is None:
+            self.risk_score = self.base_risk
 
 
 class DependencyObject(BaseModel):
