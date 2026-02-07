@@ -7,10 +7,19 @@ def render_markdown(assessment: RiskAssessment) -> str:
         "# SCIA Impact Report",
         f"**Risk Score:** {assessment.risk_score}",
         f"**Classification:** {assessment.classification}",
-        "",
-        "## Findings",
         ""
     ]
+    
+    if assessment.warnings:
+        lines.append("### ⚠️ Warnings")
+        for warning in assessment.warnings:
+            lines.append(f"- {warning}")
+        lines.append("")
+
+    lines.extend([
+        "## Findings",
+        ""
+    ])
 
     if not assessment.findings:
         lines.append("No impactful changes detected.")

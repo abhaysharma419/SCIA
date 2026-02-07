@@ -84,6 +84,7 @@ class SnowflakeAdapter(WarehouseAdapter):
             # Fetch columns metadata from INFORMATION_SCHEMA
             query = f"""
             SELECT
+                TABLE_CATALOG,
                 TABLE_SCHEMA,
                 TABLE_NAME,
                 COLUMN_NAME,
@@ -100,21 +101,23 @@ class SnowflakeAdapter(WarehouseAdapter):
             tables_data: Dict[str, List[ColumnSchema]] = {}
             for row in cursor.fetchall():
                 col = ColumnSchema(
-                    schema_name=row[0],
-                    table_name=row[1],
-                    column_name=row[2],
-                    data_type=row[3],
-                    is_nullable=(row[4] == 'YES'),
-                    ordinal_position=row[5]
+                    database_name=row[0],
+                    schema_name=row[1],
+                    table_name=row[2],
+                    column_name=row[3],
+                    data_type=row[4],
+                    is_nullable=(row[5] == 'YES'),
+                    ordinal_position=row[6]
                 )
-                if row[1] not in tables_data:
-                    tables_data[row[1]] = []
-                tables_data[row[1]].append(col)
+                if row[2] not in tables_data:
+                    tables_data[row[2]] = []
+                tables_data[row[2]].append(col)
 
             # Convert to TableSchema objects
             result = []
             for table_name, columns in tables_data.items():
                 result.append(TableSchema(
+                    database_name=target_database,
                     schema_name=target_schema,
                     table_name=table_name,
                     columns=columns

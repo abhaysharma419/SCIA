@@ -90,6 +90,8 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
         if not schema_name:
             schema_name = 'PUBLIC'
         
+        database_name = table_schema.catalog
+        
         # If schema_name is an expression, get the name
         if hasattr(schema_name, 'name'):
             schema_name = schema_name.name
@@ -100,6 +102,11 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
         
         if str(schema_name).upper() == 'NONE':
             schema_name = 'PUBLIC'
+            
+        # Clean up database name if it's an expression
+        db_name = None
+        if database_name:
+            db_name = database_name.name if hasattr(database_name, 'name') else str(database_name)
 
         if not table_name:
             logger.debug("No table name found in CREATE TABLE")
@@ -111,7 +118,7 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
 
         for col_expr in schema_def.expressions:
             if isinstance(col_expr, exp.ColumnDef):
-                col = _extract_column_from_columndef(col_expr, schema_name.upper(), table_name.upper(), ordinal_pos)
+                col = _extract_column_from_columndef(col_expr, schema_name.upper(), table_name.upper(), ordinal_pos, db_name=db_name)
                 if col:
                     columns.append(col)
                     ordinal_pos += 1
@@ -121,6 +128,7 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
             return None
 
         return TableSchema(
+            database_name=db_name.upper() if db_name else None,
             schema_name=schema_name.upper(),
             table_name=table_name.upper(),
             columns=columns
@@ -135,7 +143,8 @@ def _extract_column_from_columndef(
     col_expr: exp.ColumnDef,
     schema_name: str,
     table_name: str,
-    ordinal_pos: int
+    ordinal_pos: int,
+    db_name: Optional[str] = None
 ) -> Optional[ColumnSchema]:
     """Extract ColumnSchema from ColumnDef expression.
 
@@ -144,6 +153,7 @@ def _extract_column_from_columndef(
         schema_name: Schema name
         table_name: Table name
         ordinal_pos: Column ordinal position
+        db_name: Optional database name
 
     Returns:
         ColumnSchema object or None if extraction fails
@@ -175,6 +185,7 @@ def _extract_column_from_columndef(
                     break
 
         return ColumnSchema(
+            database_name=db_name.upper() if db_name else None,
             schema_name=schema_name,
             table_name=table_name.upper(),
             column_name=col_name.upper(),

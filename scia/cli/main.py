@@ -97,7 +97,15 @@ async def run_analyze(args):
             before_schema = _fetch_schema_from_db(metadata['before_source'], warehouse_adapter)
             after_schema = _fetch_schema_from_db(metadata['after_source'], warehouse_adapter)
 
-        # 4. Execute Analysis
+        # 4. Extract database names for warning
+        warnings = []
+        before_db = before_schema[0].database_name if before_schema else None
+        after_db = after_schema[0].database_name if after_schema else None
+        
+        if before_db and after_db and before_db.upper() != after_db.upper():
+            warnings.append(f"Database names are different: {before_db} vs {after_db}")
+
+        # 5. Execute Analysis
         assessment = await analyze(
             before_schema,
             after_schema,
@@ -105,7 +113,8 @@ async def run_analyze(args):
             warehouse_adapter=warehouse_adapter if (
                 include_up or include_down
             ) else None,
-            max_dependency_depth=dep_depth
+            max_dependency_depth=dep_depth,
+            warnings=warnings
         )
 
         # 5. Output results

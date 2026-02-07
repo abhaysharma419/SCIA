@@ -15,7 +15,8 @@ async def analyze(
     after_schema: List[TableSchema],
     sql_definitions: Optional[Dict[str, str]] = None,
     warehouse_adapter: Optional[WarehouseAdapter] = None,
-    max_dependency_depth: int = 3
+    max_dependency_depth: int = 3,
+    warnings: Optional[List[str]] = None
 ) -> RiskAssessment:
     """Core analysis orchestration with optional dependency enrichment.
 
@@ -25,6 +26,7 @@ async def analyze(
         sql_definitions: Optional SQL query definitions for signal extraction
         warehouse_adapter: Optional adapter for live impact analysis
         max_dependency_depth: Depth of downstream analysis
+        warnings: Optional warnings list
 
     Returns:
         RiskAssessment with (potentially enriched) findings and classification
@@ -71,6 +73,6 @@ async def analyze(
         final_findings = findings
 
     # 5. Aggregate risk
-    assessment = RiskAssessment(final_findings)
+    assessment = RiskAssessment(final_findings, warnings=warnings)
 
     return assessment
