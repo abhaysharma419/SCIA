@@ -1,10 +1,8 @@
 """Tests for DDL parser."""
 import pytest
 
-from scia.sql.ddl_parser import (
-    extract_table_references,
-    parse_ddl_to_schema,
-)
+from scia.sql.ddl_parser import parse_ddl_to_schema
+from scia.sql.parser import extract_table_references
 from scia.models.schema import TableSchema, ColumnSchema
 
 

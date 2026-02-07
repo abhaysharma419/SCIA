@@ -84,13 +84,13 @@ def test_cli_fail_on_behavior(fixtures_dir, tmp_path):
     medium_after.write_text(json.dumps(schema_after), encoding="utf-8")
 
     # --fail-on HIGH should PASS on MEDIUM findings
-    # Note: As of v0.2, type changes are HIGH risk (90) due to 
+    # Note: As of v0.2, type changes are HIGH risk (90) due to
     # combined rule_column_type_changed (40) + rule_potential_breakage (50).
     # To get a MEDIUM risk, we can use a nullability change.
-    
+
     null_before = tmp_path / "null_before.json"
     null_after = tmp_path / "null_after.json"
-    
+
     null_schema = [
         {
             "schema_name": "S", "table_name": "T",

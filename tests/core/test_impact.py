@@ -4,11 +4,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from scia.warehouse.base import WarehouseAdapter
 from scia.core.impact import analyze_downstream, analyze_upstream
 
 
 @pytest.fixture
 def mock_adapter():
+    """Create a mock warehouse adapter."""
     adapter = MagicMock(spec=WarehouseAdapter)
     adapter.fetch_views.return_value = {
         "view1": "SELECT * FROM public.table1",
@@ -28,18 +30,20 @@ def mock_adapter():
 
 @pytest.mark.asyncio
 async def test_analyze_downstream_direct(mock_adapter):
+    """Test finding direct downstream dependencies."""
     # table1 -> view1
     dependents = await analyze_downstream("public.table1", mock_adapter, max_depth=1)
-    
+
     assert len(dependents) == 1
     assert dependents[0].name == "view1"
     assert dependents[0].object_type == "VIEW"
 
 @pytest.mark.asyncio
 async def test_analyze_downstream_transitive(mock_adapter):
+    """Test finding transitive downstream dependencies."""
     # table1 -> view1 -> view2
     dependents = await analyze_downstream("public.table1", mock_adapter, max_depth=2)
-    
+
     assert len(dependents) == 2
     names = [d.name for d in dependents]
     assert "view1" in names
@@ -47,9 +51,10 @@ async def test_analyze_downstream_transitive(mock_adapter):
 
 @pytest.mark.asyncio
 async def test_analyze_upstream(mock_adapter):
+    """Test finding upstream dependencies."""
     # table1 -> parent_table
     upstream = await analyze_upstream("public.table1", mock_adapter)
-    
+
     assert len(upstream) == 1
     assert upstream[0].name == "parent_table"
     assert upstream[0].object_type == "TABLE"
@@ -57,6 +62,7 @@ async def test_analyze_upstream(mock_adapter):
 
 @pytest.mark.asyncio
 async def test_analyze_downstream_max_depth(mock_adapter):
+    """Test respecting max depth limit."""
     # depth 1 should only return view1
     dependents = await analyze_downstream("public.table1", mock_adapter, max_depth=1)
     assert len(dependents) == 1
@@ -64,6 +70,7 @@ async def test_analyze_downstream_max_depth(mock_adapter):
 
 @pytest.mark.asyncio
 async def test_analyze_downstream_no_views(mock_adapter):
+    """Test behavior when no views exist."""
     mock_adapter.fetch_views.return_value = {}
     dependents = await analyze_downstream("public.table1", mock_adapter)
     assert len(dependents) == 0
