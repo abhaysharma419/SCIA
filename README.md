@@ -73,9 +73,12 @@ scia analyze --before before_schema.json --after after_schema.json --format mark
 ```
 
 **SQL Mode (Migration Analysis):**
+Analyze risk of applying a SQL migration to an existing schema (JSON or DB).
 ```bash
+# Apply migration.sql to schema in base_schema.json
 scia analyze --before base_schema.json --after migration.sql --format markdown
 ```
+*Supported ALTER operations:* `ADD COLUMN`, `DROP COLUMN`, `RENAME COLUMN`, `ALTER COLUMN (TYPE/NULLABILITY)`.
 
 **Database Mode (Live):**
 ```bash

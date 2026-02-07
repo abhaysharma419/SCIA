@@ -10,7 +10,7 @@ from scia.models.schema import ColumnSchema, TableSchema
 logger = logging.getLogger(__name__)
 
 
-def parse_ddl_to_schema(ddl_sql: str) -> List[TableSchema]:
+def parse_ddl_to_schema(ddl_sql: str, base_schemas: Optional[List[TableSchema]] = None) -> List[TableSchema]:
     """Parse CREATE TABLE and ALTER TABLE DDL statements to schema objects.
 
     Supports:
@@ -27,10 +27,15 @@ def parse_ddl_to_schema(ddl_sql: str) -> List[TableSchema]:
         ddl_sql: DDL SQL text (one or more statements)
 
     Returns:
-        List of TableSchema objects extracted from CREATE TABLE statements.
-        Empty list if no valid CREATE TABLE statements found or parsing fails.
+        List of TableSchema objects extracted from CREATE TABLE and ALTER TABLE statements.
     """
     schemas: dict = {}
+
+    # Seed with base schemas if provided
+    if base_schemas:
+        for schema in base_schemas:
+            key = (schema.schema_name or 'PUBLIC', schema.table_name)
+            schemas[key] = schema.model_copy(deep=True)
 
     try:
         # Parse all statements in the DDL
@@ -53,6 +58,7 @@ def parse_ddl_to_schema(ddl_sql: str) -> List[TableSchema]:
 
             else:
                 logger.debug("Skipping unsupported statement type: %s", type(stmt).__name__)
+                logger.debug("Statement SQL: %s", stmt.sql())
 
         return list(schemas.values())
 
@@ -206,20 +212,68 @@ def _handle_alter_table(
     """Handle ALTER TABLE statement and update schemas accordingly.
 
     Supports: ADD COLUMN, DROP COLUMN, MODIFY COLUMN, RENAME COLUMN
-
-    Args:
-        stmt: sqlglot Alter expression
-        schemas: Dictionary of (schema_name, table_name) -> TableSchema
     """
     try:
-        # Get table name
-        table_name = stmt.name
-        if not table_name:
+        table_expr = stmt.this
+        if not isinstance(table_expr, exp.Table):
             return
 
-        # ALTER statements are parsed for future v0.2 features
-        # For now, we just log them as we're primarily extracting from CREATE TABLE
-        logger.debug("Parsing ALTER TABLE %s (v0.2 enhancement)", table_name)
+        # Extract table and schema names robustly
+        table_name = table_expr.this.name if hasattr(table_expr.this, 'name') else str(table_expr.this)
+        
+        schema_name = table_expr.db
+        if hasattr(schema_name, 'name'):
+            schema_name = schema_name.name
+        if not schema_name or str(schema_name).upper() == 'NONE':
+            schema_name = 'PUBLIC'
+            
+        table_name = table_name.upper()
+        schema_name = schema_name.upper()
+        key = (schema_name, table_name)
+
+        if key not in schemas:
+            logger.debug("Table %s.%s not found for ALTER", schema_name, table_name)
+            return
+
+        table_schema = schemas[key]
+
+        # Handle different ALTER actions
+        for action in stmt.args.get('actions', []):
+            # ADD COLUMN
+            if isinstance(action, exp.ColumnDef):
+                new_col = _extract_column_from_columndef(
+                    action, schema_name, table_name, len(table_schema.columns) + 1
+                )
+                if new_col:
+                    table_schema.columns.append(new_col)
+
+            # DROP COLUMN
+            elif isinstance(action, exp.Drop) and action.args.get('kind') == 'COLUMN':
+                col_name = action.this.name.upper()
+                table_schema.columns = [c for c in table_schema.columns if c.column_name.upper() != col_name]
+
+            # RENAME COLUMN
+            elif isinstance(action, exp.RenameColumn):
+                old_name = action.this.name.upper()
+                new_name = action.args.get('to').name.upper()
+                for col in table_schema.columns:
+                    if col.column_name.upper() == old_name:
+                        col.column_name = new_name
+
+            # MODIFY COLUMN / ALTER COLUMN (Type change)
+            elif isinstance(action, exp.AlterColumn):
+                col_name = action.this.name.upper()
+                for col in table_schema.columns:
+                    if col.column_name.upper() == col_name:
+                        # Update type if provided
+                        dtype = action.args.get('dtype')
+                        if dtype:
+                            col.data_type = dtype.sql(dialect='snowflake').upper()
+                        
+                        # Update nullability if provided
+                        allow_null = action.args.get('allow_null')
+                        if allow_null is not None:
+                            col.is_nullable = bool(allow_null)
 
     except Exception as e:  # pylint: disable=broad-except
         logger.warning("Failed to parse ALTER TABLE: %s", e)
