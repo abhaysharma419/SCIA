@@ -62,8 +62,15 @@ async def analyze(
                     estimated_blast_radius=len(downstream)
                 )
                 
+                # Adjust risk score based on blast radius
+                # If no dependents found, reduce risk by 25% (as per user preference)
+                adjusted_score = finding.risk_score
+                if impact.estimated_blast_radius == 0 and finding.base_risk > 0:
+                    adjusted_score = int(finding.risk_score * 0.75)
+
                 enriched = EnrichedFinding(
-                    **finding.model_dump(),
+                    **finding.model_dump(exclude={"risk_score"}),
+                    risk_score=adjusted_score,
                     impact_detail=impact
                 )
                 final_findings.append(enriched)

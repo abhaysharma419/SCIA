@@ -14,7 +14,8 @@ async def test_analyze_pipeline(table_factory, column_factory):
 
     assessment = await analyze(before, after)
 
-    assert assessment.risk_score == 80
+    # 100 * 80 / (80 + 100) = 44.4
+    assert assessment.risk_score == 44
     assert assessment.classification == "HIGH"
     assert len(assessment.findings) == 1
     assert assessment.findings[0].finding_type == "COLUMN_REMOVED"
@@ -32,8 +33,9 @@ async def test_analyze_multiple_findings(table_factory, column_factory):
 
     assessment = await analyze(before, after)
 
-    # 80 (removed C2) + 40 (type change C1) + 50 (potential breakage) = 170
-    assert assessment.risk_score == 170
+    # Raw: 80 (removed C2) + 40 (type change C1) + 50 (potential breakage) = 170
+    # Normalized: 100 * 170 / (170 + 100) = 62.9
+    assert assessment.risk_score == 62
     assert assessment.classification == "HIGH"
     assert len(assessment.findings) == 3
 
@@ -62,7 +64,8 @@ async def test_analyze_graceful_sql_degradation(mock_extract, table_factory, col
     # the schema-based analysis should still work.
     assessment = await analyze(before, after, sql_definitions={"q1": "SELECT * FROM T"})
 
-    assert assessment.risk_score == 80
+    # 100 * 80 / 180 = 44
+    assert assessment.risk_score == 44
     assert len(assessment.findings) == 1
 
 @pytest.mark.asyncio
@@ -74,10 +77,10 @@ async def test_analyze_sql_signals_parameter(table_factory, column_factory):
 
     # No SQL signals
     assessment_no_sql = await analyze(before, after, sql_definitions=None)
-    assert assessment_no_sql.risk_score == 80
+    assert assessment_no_sql.risk_score == 44
 
     # With SQL signals
     assessment_with_sql = await analyze(
         before, after, sql_definitions={"q1": "SELECT C1 FROM TEST_TABLE"}
     )
-    assert assessment_with_sql.risk_score == 80
+    assert assessment_with_sql.risk_score == 44
