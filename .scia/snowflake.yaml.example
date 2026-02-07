@@ -1,0 +1,29 @@
+# Snowflake Connection Configuration Example
+
+# Copy this file to ~/.scia/snowflake.yaml and update with your credentials
+
+# Snowflake account identifier (e.g., "xy12345.us-east-1")
+account: "your-account.snowflakecomputing.com"
+
+# Snowflake username
+user: "your-username"
+
+# Snowflake password (consider using environment variables for security)
+password: "your-password"
+
+# Default warehouse for queries
+warehouse: "COMPUTE_WH"
+
+# Default database
+database: "PROD_DB"
+
+# Default schema
+schema: "ANALYTICS"
+
+# Role to use for connection
+role: "ANALYST_ROLE"
+
+# Optional: Additional connection parameters
+# authenticator: "externalbrowser"  # For SSO authentication
+# session_parameters:
+#   QUERY_TAG: "SCIA_ANALYSIS"

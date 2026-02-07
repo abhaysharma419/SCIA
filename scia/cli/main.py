@@ -51,15 +51,18 @@ async def run_analyze(args):
         # 1. Resolve input sources
         input_type, metadata = resolve_input(args.before, args.after, warehouse_type)
 
-        # 2. Get Warehouse Adapter
+        # 2. Validate arguments
+        _validate_args(args, input_type)
+
+        # 3. Get Warehouse Adapter
         warehouse_adapter = _get_warehouse_adapter(warehouse_type, conn_file)
 
-        # 3. Load Schemas
+        # 4. Load Schemas
         before_schema, after_schema, sql_definitions = _load_schemas(
             args, input_type, metadata, warehouse_adapter
         )
 
-        # 4. Warnings and Analysis
+        # 5. Warnings and Analysis
         warnings = []
         if before_schema and after_schema:
             b_db = before_schema[0].database_name
@@ -67,7 +70,7 @@ async def run_analyze(args):
             if b_db and a_db and b_db.upper() != a_db.upper():
                 warnings.append(f"Database names are different: {b_db} vs {a_db}")
 
-        # 5. Execute Analysis & Output
+        # 6. Execute Analysis & Output
         analysis_config = {
             'dep_depth': getattr(args, 'dependency_depth', 3),
             'warnings': warnings,
@@ -130,6 +133,7 @@ def _handle_exit_code(fail_on, classification):
 
 
 def _get_warehouse_adapter(warehouse_type, conn_file):
+    """Get warehouse adapter with improved error messages."""
     if not warehouse_type:
         return None
     try:
@@ -137,9 +141,62 @@ def _get_warehouse_adapter(warehouse_type, conn_file):
         adapter = get_adapter(warehouse_type)
         adapter.connect(config)
         return adapter
+    except NotImplementedError:
+        print(
+            f"Error: {warehouse_type.capitalize()} adapter not yet implemented.\n"
+            f"Currently supported: snowflake\n"
+            f"Planned: databricks, postgres, redshift",
+            file=sys.stderr
+        )
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:  # pylint: disable=broad-except
-        print(f"Warning: Failed to connect to {warehouse_type}: {e}", file=sys.stderr)
-        return None
+        print(
+            f"Error: Connection failed to {warehouse_type}.\n"
+            f"Details: {e}\n"
+            f"Check your connection config at ~/.scia/{warehouse_type}.yaml "
+            f"or provide --conn-file.",
+            file=sys.stderr
+        )
+        sys.exit(1)
+
+
+def _validate_args(args, input_type):
+    """Validate CLI arguments and provide helpful error messages."""
+    # Validate dependency-depth range
+    dep_depth = getattr(args, 'dependency_depth', 3)
+    if dep_depth < 1 or dep_depth > 10:
+        print(
+            f"Error: max_depth must be 1-10, got {dep_depth}.",
+            file=sys.stderr
+        )
+        sys.exit(1)
+    
+    # Validate warehouse requirement for DATABASE mode
+    warehouse_type = getattr(args, 'warehouse', None)
+    if input_type == InputType.DATABASE and not warehouse_type:
+        print(
+            "Error: DB mode requires --warehouse flag.\n"
+            "Example: scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS "
+            "--warehouse snowflake",
+            file=sys.stderr
+        )
+        sys.exit(1)
+    
+    # Validate connection file exists if specified
+    conn_file = getattr(args, 'conn_file', None)
+    if conn_file:
+        import os
+        if not os.path.exists(conn_file):
+            print(
+                f"Error: Connection file not found: {conn_file}\n"
+                f"Please check the path or use default location: "
+                f"~/.scia/{{warehouse}}.yaml",
+                file=sys.stderr
+            )
+            sys.exit(1)
 
 
 def _load_schemas(args, input_type, metadata, adapter):
@@ -159,7 +216,11 @@ def _load_schemas(args, input_type, metadata, adapter):
 
     elif input_type == InputType.DATABASE:
         if not adapter:
-            raise ValueError("Database mode requires --warehouse")
+            raise ValueError(
+                "Database mode requires --warehouse flag.\n"
+                "Example: scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS "
+                "--warehouse snowflake"
+            )
         before_schema = _fetch_schema_from_db(metadata['before_source'], adapter)
         after_schema = _fetch_schema_from_db(metadata['after_source'], adapter)
 
@@ -197,48 +258,66 @@ def _load_sql_after(args, metadata, adapter, before_schema):
 
 def main():
     """Parse command line arguments and execute appropriate command."""
-    parser = argparse.ArgumentParser(description="SCIA - SQL Change Impact Analyzer")
+    parser = argparse.ArgumentParser(
+        description="SCIA - SQL Change Impact Analyzer",
+        epilog="Examples:\n"
+               "  JSON mode:  scia analyze --before before.json --after after.json\n"
+               "  SQL mode:   scia analyze --before base.json --after migration.sql\n"
+               "  DB mode:    scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS --warehouse snowflake",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     # Analyze command
-    analyze_parser = subparsers.add_parser("analyze")
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Analyze schema changes and assess risk",
+        description="Analyze schema changes between two states (JSON, SQL, or live DB)"
+    )
     analyze_parser.add_argument(
         "--before", required=True,
-        help="Before schema (JSON file, SQL file, or SCHEMA.TABLE)"
+        help="Before schema: JSON file (schema.json), SQL file (schema.sql), or database identifier (SCHEMA.TABLE)"
     )
     analyze_parser.add_argument(
         "--after", required=True,
-        help="After schema (JSON file, SQL file, or SCHEMA.TABLE)"
+        help="After schema: JSON file, SQL migration file, or database identifier"
     )
     analyze_parser.add_argument(
         "--warehouse",
         choices=["snowflake", "databricks", "postgres", "redshift"],
-        help="Warehouse type"
+        help="Warehouse type (required for DB mode, optional for enrichment). Currently supported: snowflake"
     )
-    analyze_parser.add_argument("--conn-file", help="Path to connection config file")
+    analyze_parser.add_argument(
+        "--conn-file",
+        help="Path to connection config file (default: ~/.scia/{warehouse}.yaml)"
+    )
     analyze_parser.add_argument(
         "--dependency-depth", type=int, default=3,
-        help="Max depth for dependency analysis (1-10)"
+        help="Max depth for dependency analysis (1-10, default: 3). Higher values analyze more transitive dependencies."
     )
     analyze_parser.add_argument(
         "--include-upstream", action="store_true", default=True,
-        help="Include upstream dependencies"
+        help="Include upstream dependencies (tables/views this schema depends on)"
     )
     analyze_parser.add_argument(
-        "--no-upstream", action="store_false", dest="include_upstream"
+        "--no-upstream", action="store_false", dest="include_upstream",
+        help="Disable upstream dependency analysis"
     )
     analyze_parser.add_argument(
         "--include-downstream", action="store_true", default=True,
-        help="Include downstream dependencies"
+        help="Include downstream dependencies (views/tables that depend on this schema)"
     )
     analyze_parser.add_argument(
-        "--no-downstream", action="store_false", dest="include_downstream"
+        "--no-downstream", action="store_false", dest="include_downstream",
+        help="Disable downstream dependency analysis"
     )
     analyze_parser.add_argument(
-        "--format", choices=["json", "markdown"], default="json"
+        "--format", choices=["json", "markdown"], default="json",
+        help="Output format (default: json)"
     )
     analyze_parser.add_argument(
-        "--fail-on", choices=["HIGH", "MEDIUM", "LOW"], default="HIGH"
+        "--fail-on", choices=["HIGH", "MEDIUM", "LOW"], default="HIGH",
+        help="Exit with code 1 if risk meets or exceeds this threshold (default: HIGH)"
     )
 
     # Diff command (legacy/simple)

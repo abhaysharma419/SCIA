@@ -99,6 +99,9 @@ Findings:
    - Evidence: table=customers, column=email
 ```
 
+> [!NOTE]
+> **New to v0.2?** Check out the [Advanced Usage Guide](docs/USAGE_V02.md) for SQL migration analysis, live database connections, and dependency analysis features.
+
 ---
 
 ## 📋 Common Use Cases
@@ -453,22 +456,98 @@ scia analyze --before base.json --after scenario2.json
 
 ---
 
+## 🔧 Troubleshooting
+
+### Connection Issues
+
+**Problem**: `Error: Connection failed to snowflake`
+
+**Solutions**:
+1. Verify config file exists: `ls ~/.scia/snowflake.yaml`
+2. Check credentials in config file
+3. Ensure account identifier is correct (format: `account.region.snowflakecomputing.com`)
+4. Use `--conn-file` to specify custom config location
+
+**Example**:
+```bash
+# Use custom config file
+scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS \
+  --warehouse snowflake --conn-file ~/my-config.yaml
+```
+
+---
+
+### SQL Parsing Errors
+
+**Problem**: `Warning: Failed to parse SQL in migration.sql`
+
+**Explanation**: SCIA supports CREATE TABLE, ALTER ADD/DROP/MODIFY/RENAME COLUMN. Other DDL is ignored.
+
+**What Happens**: Analysis continues with schema-based rules only (no SQL-specific rules).
+
+**Supported Operations**:
+- ✅ `CREATE TABLE`
+- ✅ `ALTER TABLE ADD COLUMN`
+- ✅ `ALTER TABLE DROP COLUMN`
+- ✅ `ALTER TABLE RENAME COLUMN`
+- ✅ `ALTER TABLE ALTER COLUMN` (type/nullability changes)
+- ❌ Stored procedures, triggers, constraints (ignored)
+
+---
+
+### Dependency Analysis Errors
+
+**Problem**: `Error: max_depth must be 1-10, got 15`
+
+**Solution**: Use `--dependency-depth` with value between 1 and 10:
+```bash
+scia analyze --before a.json --after b.json --dependency-depth 5
+```
+
+---
+
+**Problem**: `Error: DB mode requires --warehouse flag`
+
+**Solution**: Add `--warehouse` when comparing database identifiers:
+```bash
+scia analyze --before PROD.ANALYTICS --after DEV.ANALYTICS --warehouse snowflake
+```
+
+---
+
+### Unsupported Warehouse
+
+**Problem**: `Error: Databricks adapter not yet implemented`
+
+**Current Support**:
+- ✅ Snowflake (fully working)
+- 🏗️ Databricks (planned for v0.3)
+- 🏗️ PostgreSQL (planned for v0.3)
+- 🏗️ Redshift (planned for v0.3)
+
+**Workaround**: Export your schema to JSON and use JSON mode:
+```bash
+scia analyze --before schema.json --after modified.json
+```
+
+---
+
 ## ❓ FAQ
 
 **Q: Can SCIA connect to my warehouse directly?**  
-A: Yes! As of v0.2, SCIA supports live connections to Snowflake (others as stubs). Use the `--warehouse` flag.
+A: Yes! v0.2 supports live connections to Snowflake. Use `--warehouse snowflake` and configure `~/.scia/snowflake.yaml`. See the [Advanced Usage Guide](docs/USAGE_V02.md) for details.
 
 **Q: Do I need dbt?**  
-A: No. SCIA works with plain SQL and warehouse metadata.
+A: No. SCIA works with plain SQL, JSON exports, and warehouse metadata.
 
-**Q: Is this for Snowflake only?**  
-A: v0.1 is Snowflake-focused. BigQuery and Databricks support planned.
+**Q: What warehouses are supported?**  
+A: v0.2 fully supports Snowflake. Databricks, PostgreSQL, and Redshift are planned for v0.3.
 
-**Q: What if schema has thousands of columns?**  
-A: SCIA analyzes the diff, not absolute size. Should be fast.
+**Q: What if my schema has thousands of columns?**  
+A: SCIA analyzes the diff, not absolute size. Performance should be acceptable. Use `--dependency-depth 1` for faster analysis.
 
 **Q: Can I use this in production?**  
-A: Yes, but start with v0.1's known limitations. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
+A: Yes! v0.2 is production-ready. Start with JSON mode for testing, then enable live warehouse connections. See [docs/USAGE_V02.md](docs/USAGE_V02.md) for best practices.
 
 ---
 
@@ -492,17 +571,18 @@ Apache 2.0 — See LICENSE file
 
 ## 🚀 What's Next?
 
-- **v0.1** ✅: Core schema diff, risk scoring, JSON-based analysis.
-- **v0.2** ✅: SQL migration parsing, live warehouse connectivity (Snowflake), and downstream impact analysis.
-- **v0.3** 🏗️: Advanced risk policies, incident pattern matching, and multi-warehouse support.
+- **v0.1** ✅: Core schema diff, risk scoring, JSON-based analysis
+- **v0.2** ✅: SQL migration parsing, live warehouse connectivity (Snowflake), downstream impact analysis
+- **v0.3** 🏗️: Multi-warehouse support (Databricks, PostgreSQL, Redshift), advanced risk policies, incident pattern matching
 
 ---
 
 ## 💬 Questions?
 
-- Check [DOCS_INDEX.md](DOCS_INDEX.md) for documentation
-- See [docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md) for project layout
-- Read [.github/copilot-instructions.md](.github/copilot-instructions.md) for architecture
+- Check [docs/USAGE_V02.md](docs/USAGE_V02.md) for advanced v0.2 features
+- See [DOCS_INDEX.md](DOCS_INDEX.md) for all documentation
+- Read [docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md) for project layout
+- Check [.github/copilot-instructions.md](.github/copilot-instructions.md) for architecture
 
 
 
