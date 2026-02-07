@@ -3,10 +3,17 @@ from scia.core.risk import RiskAssessment
 
 def render_markdown(assessment: RiskAssessment) -> str:
     """Render risk assessment as Markdown report."""
+    # Determine classification emoji
+    class_emoji = "🟢"
+    if assessment.classification == "HIGH":
+        class_emoji = "🔴"
+    elif assessment.classification == "MEDIUM":
+        class_emoji = "🟡"
+
     lines = [
         "# SCIA Impact Report",
         f"**Overall Risk Score:** {assessment.risk_score}/100",
-        f"**Classification:** {assessment.classification}",
+        f"**Classification:** {class_emoji} {assessment.classification}",
         ""
     ]
     
@@ -24,7 +31,14 @@ def render_markdown(assessment: RiskAssessment) -> str:
     if not assessment.findings:
         lines.append("No impactful changes detected.")
     else:
-        for finding in assessment.findings:
+        # Sort findings by severity (HIGH > MEDIUM > LOW)
+        severity_priority = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+        sorted_findings = sorted(
+            assessment.findings,
+            key=lambda f: severity_priority.get(f.severity.value if hasattr(f.severity, 'value') else str(f.severity), 3)
+        )
+        
+        for finding in sorted_findings:
             if finding.severity == "HIGH":
                 emoji = "🔴"
             elif finding.severity == "MEDIUM":

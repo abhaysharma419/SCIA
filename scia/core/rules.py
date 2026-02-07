@@ -94,15 +94,33 @@ def rule_column_added(diff: SchemaDiff) -> List[Finding]:
             ))
     return findings
 
-def rule_column_type_changed(diff: SchemaDiff) -> List[Finding]:
+def rule_column_type_changed(diff: SchemaDiff,
+                             sql_signals: Optional[Dict[str, Any]] = None) -> List[Finding]:
     """Detect column type changes."""
     findings = []
+    
+    referenced_columns = set()
+    if sql_signals:
+        for metadata in sql_signals.values():
+            if hasattr(metadata, 'columns'):
+                for col in metadata.columns:
+                    referenced_columns.add(col.upper())
+
     for change in diff.changes:
         if change.object_type == 'COLUMN' and change.change_type == 'TYPE_CHANGED':
+            # Base risk for type change
+            risk = 40
+            severity = Severity.MEDIUM
+            
+            # If we know the column is used in SQL, increase risk
+            if sql_signals and change.column_name.upper() in referenced_columns:
+                risk = 50
+                severity = Severity.MEDIUM # Still medium, but higher score
+
             findings.append(Finding(
                 finding_type=FindingType.COLUMN_TYPE_CHANGED,
-                severity=Severity.MEDIUM,
-                base_risk=40,
+                severity=severity,
+                base_risk=risk,
                 evidence={
                     "table": change.table_name,
                     "column": change.column_name,
@@ -206,37 +224,6 @@ def rule_grain_change(diff: SchemaDiff,
             ))
     return findings
 
-def rule_potential_breakage(diff: SchemaDiff,
-                             sql_signals: Optional[Dict[str, Any]] = None) -> List[Finding]:
-    """Catch-all for complex changes. MEDIUM severity."""
-    findings = []
-    referenced_columns = set()
-    if sql_signals:
-        for metadata in sql_signals.values():
-            if hasattr(metadata, 'columns'):
-                for col in metadata.columns:
-                    referenced_columns.add(col.upper())
-
-    for change in diff.changes:
-        if change.object_type == 'COLUMN' and change.change_type == 'TYPE_CHANGED':
-            # If we have SQL signals, only flag if the column is actually referenced
-            if not sql_signals or change.column_name.upper() in referenced_columns:
-                findings.append(Finding(
-                    finding_type=FindingType.POTENTIAL_BREAKAGE,
-                    severity=Severity.MEDIUM,
-                    base_risk=50,
-                    evidence={
-                        "table": change.table_name,
-                        "column": change.column_name,
-                        "before": change.before.data_type,
-                        "after": change.after.data_type
-                    },
-                    description=(
-                        f"Type change for column '{change.column_name}' in table "
-                        f"'{change.table_name}' ({change.before.data_type} -> "
-                        f"{change.after.data_type}) may cause downstream issues."
-                    )
-                ))
     return findings
 
 ALL_RULES = [
@@ -250,7 +237,7 @@ ALL_RULES = [
     rule_nullability_changed,
     rule_join_key_changed,
     rule_grain_change,
-    rule_potential_breakage
+    # rule_potential_breakage removed to avoid double counting
 ]
 
 def apply_rules(diff: SchemaDiff,

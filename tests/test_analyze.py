@@ -33,11 +33,11 @@ async def test_analyze_multiple_findings(table_factory, column_factory):
 
     assessment = await analyze(before, after)
 
-    # Raw: 80 (removed C2) + 40 (type change C1) + 50 (potential breakage) = 170
-    # Normalized: 100 * 170 / (170 + 100) = 62.9
-    assert assessment.risk_score == 62
+    # Raw: 80 (removed C2) + 40 (type change C1) = 120
+    # Normalized: 100 * 120 / (120 + 100) = 54.5
+    assert assessment.risk_score == 54
     assert assessment.classification == "HIGH"
-    assert len(assessment.findings) == 3
+    assert len(assessment.findings) == 2
 
 @pytest.mark.asyncio
 async def test_analyze_risk_integration(table_factory):
