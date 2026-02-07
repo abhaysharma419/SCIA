@@ -28,7 +28,14 @@ def load_schema_file(path: str) -> List[TableSchema]:
 
 def _fetch_schema_from_db(identifier: str, adapter) -> List[TableSchema]:
     """Internal helper to fetch schema from database identifier."""
-    database, schema, _ = parse_identifier(identifier)
+    database, schema, table = parse_identifier(identifier)
+    
+    # Ambiguity treatment: If 2 parts were provided (schema, table) but we want a WHOLE schema,
+    # then parts are more likely to be (database, schema).
+    if not database and schema and table:
+        database = schema
+        schema = table
+        
     return adapter.fetch_schema(database, schema)
 
 async def run_analyze(args):

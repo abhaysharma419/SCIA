@@ -73,8 +73,8 @@ def finding_factory():
 @pytest.fixture
 def schema_diff_factory():
     """Factory to create SchemaDiff instances for testing."""
-    def _make_diff(column_changes=None):
-        if column_changes is None:
-            column_changes = []
-        return SchemaDiff(column_changes=column_changes)
+    def _make_diff(changes=None):
+        if changes is None:
+            changes = []
+        return SchemaDiff(changes=changes)
     return _make_diff

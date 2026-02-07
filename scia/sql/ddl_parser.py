@@ -78,34 +78,40 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
             logger.debug("No schema definition found in CREATE TABLE")
             return None
 
-        # Get table name from the schema
-        # The table name is actually stored in parent of the schema
-        table_name = None
-        if hasattr(schema_def, 'this') and schema_def.this:
-            # schema_def.this is the table identifier
-            if hasattr(schema_def.this, 'name'):
-                table_name = schema_def.this.name
-            else:
-                table_name = str(schema_def.this)
+        # Get table and schema from the schema definition
+        table_schema = schema_def.this
+        if not isinstance(table_schema, exp.Table):
+            logger.debug("No table definition found in CREATE TABLE")
+            return None
 
-        if not table_name:
-            # Try alternative: get from schema.name
-            table_name = schema_def.name
+        table_name = table_schema.this.name if hasattr(table_schema.this, 'name') else str(table_schema.this)
+        
+        schema_name = table_schema.db
+        if not schema_name:
+            schema_name = 'PUBLIC'
+        
+        # If schema_name is an expression, get the name
+        if hasattr(schema_name, 'name'):
+            schema_name = schema_name.name
+        
+        # Double check in case name was empty
+        if not schema_name:
+            schema_name = 'PUBLIC'
+        
+        if str(schema_name).upper() == 'NONE':
+            schema_name = 'PUBLIC'
 
         if not table_name:
             logger.debug("No table name found in CREATE TABLE")
             return None
 
-        # Extract schema name (default to PUBLIC)
-        schema_name = 'PUBLIC'
-
-        # Get columns from schema expressions
+        # Extract columns from schema expressions
         columns = []
         ordinal_pos = 1
 
         for col_expr in schema_def.expressions:
             if isinstance(col_expr, exp.ColumnDef):
-                col = _extract_column_from_columndef(col_expr, schema_name, table_name, ordinal_pos)
+                col = _extract_column_from_columndef(col_expr, schema_name.upper(), table_name.upper(), ordinal_pos)
                 if col:
                     columns.append(col)
                     ordinal_pos += 1
@@ -115,7 +121,7 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
             return None
 
         return TableSchema(
-            schema_name=schema_name,
+            schema_name=schema_name.upper(),
             table_name=table_name.upper(),
             columns=columns
         )
