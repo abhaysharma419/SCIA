@@ -16,7 +16,7 @@ def render_markdown(assessment: RiskAssessment) -> str:
         f"**Classification:** {class_emoji} {assessment.classification}",
         ""
     ]
-    
+
     if assessment.warnings:
         lines.append("### ⚠️ Warnings")
         for warning in assessment.warnings:
@@ -35,9 +35,12 @@ def render_markdown(assessment: RiskAssessment) -> str:
         severity_priority = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
         sorted_findings = sorted(
             assessment.findings,
-            key=lambda f: severity_priority.get(f.severity.value if hasattr(f.severity, 'value') else str(f.severity), 3)
+            key=lambda f: severity_priority.get(
+                f.severity.value if hasattr(f.severity, 'value') else str(f.severity),
+                3
+            )
         )
-        
+
         for finding in sorted_findings:
             if finding.severity == "HIGH":
                 emoji = "🔴"

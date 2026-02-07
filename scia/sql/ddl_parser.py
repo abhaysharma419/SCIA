@@ -10,7 +10,10 @@ from scia.models.schema import ColumnSchema, TableSchema
 logger = logging.getLogger(__name__)
 
 
-def parse_ddl_to_schema(ddl_sql: str, base_schemas: Optional[List[TableSchema]] = None) -> List[TableSchema]:
+def parse_ddl_to_schema(
+    ddl_sql: str, 
+    base_schemas: Optional[List[TableSchema]] = None
+) -> List[TableSchema]:
     """Parse CREATE TABLE and ALTER TABLE DDL statements to schema objects.
 
     Supports:
@@ -91,24 +94,24 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
             return None
 
         table_name = table_schema.this.name if hasattr(table_schema.this, 'name') else str(table_schema.this)
-        
+
         schema_name = table_schema.db
         if not schema_name:
             schema_name = 'PUBLIC'
-        
+
         database_name = table_schema.catalog
-        
+
         # If schema_name is an expression, get the name
         if hasattr(schema_name, 'name'):
             schema_name = schema_name.name
-        
+
         # Double check in case name was empty
         if not schema_name:
             schema_name = 'PUBLIC'
-        
+
         if str(schema_name).upper() == 'NONE':
             schema_name = 'PUBLIC'
-            
+
         # Clean up database name if it's an expression
         db_name = None
         if database_name:
@@ -220,13 +223,13 @@ def _handle_alter_table(
 
         # Extract table and schema names robustly
         table_name = table_expr.this.name if hasattr(table_expr.this, 'name') else str(table_expr.this)
-        
+
         schema_name = table_expr.db
         if hasattr(schema_name, 'name'):
             schema_name = schema_name.name
         if not schema_name or str(schema_name).upper() == 'NONE':
             schema_name = 'PUBLIC'
-            
+
         table_name = table_name.upper()
         schema_name = schema_name.upper()
         key = (schema_name, table_name)
@@ -269,7 +272,7 @@ def _handle_alter_table(
                         dtype = action.args.get('dtype')
                         if dtype:
                             col.data_type = dtype.sql(dialect='snowflake').upper()
-                        
+
                         # Update nullability if provided
                         allow_null = action.args.get('allow_null')
                         if allow_null is not None:

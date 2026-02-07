@@ -1,6 +1,6 @@
 """Downstream and upstream impact analysis."""
 import logging
-from typing import Dict, List, Optional
+from typing import List
 
 from scia.core.utils import parse_identifier
 from scia.models.finding import DependencyObject
@@ -14,12 +14,12 @@ async def analyze_downstream(
     max_depth: int = 3
 ) -> List[DependencyObject]:
     """Recursively find views/tables depending on changed_table.
-    
+
     Args:
         changed_table: Fully qualified table name (DATABASE.SCHEMA.TABLE)
         warehouse_adapter: Adapter to query warehouse metadata
         max_depth: Maximum recursion depth for transitive dependencies
-        
+
     Returns:
         List of DependencyObject representing downstream dependents.
     """
@@ -58,7 +58,7 @@ async def analyze_downstream(
             ref_tables = warehouse_adapter.parse_table_references(sql)
             # Normalize references for comparison
             normalized_refs = [t.upper() for t in ref_tables]
-            
+
             # Use both short and long names for matching to be robust
             target_matches = {current_obj}
             if '.' in current_obj:
@@ -82,11 +82,11 @@ async def analyze_upstream(
     warehouse_adapter: WarehouseAdapter
 ) -> List[DependencyObject]:
     """Find tables/views this table depends on (e.g., via Foreign Keys).
-    
+
     Args:
         changed_table: Fully qualified table name
         warehouse_adapter: Adapter to query warehouse metadata
-        
+
     Returns:
         List of DependencyObject representing upstream dependencies.
     """

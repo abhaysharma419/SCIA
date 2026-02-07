@@ -1,3 +1,4 @@
+"""Schema models for tables and columns."""
 from typing import List, Optional
 
 from pydantic import BaseModel

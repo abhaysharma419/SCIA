@@ -29,13 +29,13 @@ def load_schema_file(path: str) -> List[TableSchema]:
 def _fetch_schema_from_db(identifier: str, adapter) -> List[TableSchema]:
     """Internal helper to fetch schema from database identifier."""
     database, schema, table = parse_identifier(identifier)
-    
+
     # Ambiguity treatment: If 2 parts were provided (schema, table) but we want a WHOLE schema,
     # then parts are more likely to be (database, schema).
     if not database and schema and table:
         database = schema
         schema = table
-        
+
     return adapter.fetch_schema(database, schema)
 
 async def run_analyze(args):
@@ -53,12 +53,16 @@ async def run_analyze(args):
 
         # 1. Resolve input sources
         input_type, metadata = resolve_input(args.before, args.after, warehouse_type)
-        
+
         # 2. Initialize warehouse adapter if needed
         if warehouse_type:
-            config = load_connection_config(warehouse_type, conn_file)
-            warehouse_adapter = get_adapter(warehouse_type)
-            warehouse_adapter.connect(config)
+            try:
+                config = load_connection_config(warehouse_type, conn_file)
+                warehouse_adapter = get_adapter(warehouse_type)
+                warehouse_adapter.connect(config)
+            except Exception as e:  # pylint: disable=broad-except
+                print(f"Warning: Failed to connect to {warehouse_type}: {e}", file=sys.stderr)
+                warehouse_adapter = None
 
         before_schema = []
         after_schema = []
@@ -68,22 +72,30 @@ async def run_analyze(args):
         if input_type == InputType.JSON:
             before_schema = load_schema_file(args.before)
             after_schema = load_schema_file(args.after)
-        
+
         elif input_type == InputType.SQL:
             if metadata['before_format'] == 'sql':
-                with open(args.before, 'r', encoding='utf-8') as f:
-                    before_schema = parse_ddl_to_schema(f.read())
+                try:
+                    with open(args.before, 'r', encoding='utf-8') as f:
+                        before_schema = parse_ddl_to_schema(f.read())
+                except Exception as e:  # pylint: disable=broad-except
+                    print(f"Warning: Failed to parse SQL in {args.before}: {e}", file=sys.stderr)
+                    before_schema = []
             elif metadata['before_format'] == 'database' and warehouse_adapter:
                 before_schema = _fetch_schema_from_db(args.before, warehouse_adapter)
             else:
                 before_schema = load_schema_file(args.before)
-                
+
             # Handle After
             if metadata['after_format'] == 'sql':
-                with open(args.after, 'r', encoding='utf-8') as f:
-                    sql_content = f.read()
-                    after_schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
-                    sql_definitions = {"migration": sql_content}
+                try:
+                    with open(args.after, 'r', encoding='utf-8') as f:
+                        sql_content = f.read()
+                        after_schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
+                        sql_definitions = {"migration": sql_content}
+                except Exception as e:  # pylint: disable=broad-except
+                    print(f"Warning: Failed to parse SQL in {args.after}: {e}", file=sys.stderr)
+                    after_schema = before_schema  # Fallback to no change if parser fails
             elif metadata['after_format'] == 'database' and warehouse_adapter:
                 after_schema = _fetch_schema_from_db(args.after, warehouse_adapter)
             else:
@@ -100,7 +112,7 @@ async def run_analyze(args):
         warnings = []
         before_db = before_schema[0].database_name if before_schema else None
         after_db = after_schema[0].database_name if after_schema else None
-        
+
         if before_db and after_db and before_db.upper() != after_db.upper():
             warnings.append(f"Database names are different: {before_db} vs {after_db}")
 

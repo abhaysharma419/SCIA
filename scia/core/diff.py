@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel
 
-from scia.models.schema import ColumnSchema, TableSchema
+from scia.models.schema import TableSchema
 
 class SchemaChange(BaseModel):
     """Represents a change between schema versions at any level (Schema, Table, Column)."""
@@ -38,14 +38,14 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
     before_schemas = {}
     for t in before:
         before_schemas.setdefault(t.schema_name, []).append(t)
-    
+
     after_schemas = {}
     for t in after:
         after_schemas.setdefault(t.schema_name, []).append(t)
 
     # 1. Schema Level Comparison
     all_schema_names = set(before_schemas.keys()) | set(after_schemas.keys())
-    
+
     for schema_name in all_schema_names:
         b_tables = before_schemas.get(schema_name)
         a_tables = after_schemas.get(schema_name)
@@ -57,7 +57,7 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
                 change_type='REMOVED'
             ))
             continue
-        
+
         if not b_tables and a_tables:
             all_changes.append(SchemaChange(
                 object_type='SCHEMA',
@@ -69,9 +69,9 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
         # 2. Table Level Comparison (if schema exists in both)
         before_table_map = {t.table_name: t for t in b_tables}
         after_table_map = {t.table_name: t for t in a_tables}
-        
+
         all_table_names = set(before_table_map.keys()) | set(after_table_map.keys())
-        
+
         for table_name in all_table_names:
             b_table = before_table_map.get(table_name)
             a_table = after_table_map.get(table_name)
@@ -84,7 +84,7 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
                     change_type='REMOVED'
                 ))
                 continue
-            
+
             if not b_table and a_table:
                 all_changes.append(SchemaChange(
                     object_type='TABLE',
@@ -99,7 +99,7 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
 
     return SchemaDiff(changes=all_changes)
 
-def _process_column_level_diff(schema_name: str, table_name: str, 
+def _process_column_level_diff(schema_name: str, table_name: str,
                              before_table: TableSchema, after_table: TableSchema,
                              changes: list) -> None:
     """Compare columns within a table that exists in both versions."""

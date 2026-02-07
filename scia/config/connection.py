@@ -66,7 +66,7 @@ def load_connection_config(
     return config
 
 
-def _load_yaml_config(file_path: str, warehouse: str) -> Dict[str, Any]:
+def _load_yaml_config(file_path: str, _warehouse: str) -> Dict[str, Any]:
     """Load YAML configuration file.
 
     Args:
