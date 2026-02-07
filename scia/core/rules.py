@@ -42,7 +42,8 @@ def rule_table_removed(diff: SchemaDiff) -> List[Finding]:
                 severity=Severity.HIGH,
                 base_risk=90,
                 evidence={"schema": change.schema_name, "table": change.table_name},
-                description=f"Table '{change.table_name}' was removed from schema '{change.schema_name}'."
+                description=f"Table '{change.table_name}' was removed from "
+                            f"schema '{change.schema_name}'."
             ))
     return findings
 
@@ -56,7 +57,8 @@ def rule_table_added(diff: SchemaDiff) -> List[Finding]:
                 severity=Severity.LOW,
                 base_risk=0,
                 evidence={"schema": change.schema_name, "table": change.table_name},
-                description=f"New table '{change.table_name}' was added to schema '{change.schema_name}'."
+                description=f"New table '{change.table_name}' was added to "
+                            f"schema '{change.schema_name}'."
             ))
     return findings
 
@@ -98,7 +100,7 @@ def rule_column_type_changed(diff: SchemaDiff,
                              sql_signals: Optional[Dict[str, Any]] = None) -> List[Finding]:
     """Detect column type changes."""
     findings = []
-    
+
     referenced_columns = set()
     if sql_signals:
         for metadata in sql_signals.values():
@@ -111,7 +113,7 @@ def rule_column_type_changed(diff: SchemaDiff,
             # Base risk for type change
             risk = 40
             severity = Severity.MEDIUM
-            
+
             # If we know the column is used in SQL, increase risk
             if sql_signals and change.column_name.upper() in referenced_columns:
                 risk = 50
@@ -205,7 +207,7 @@ def rule_grain_change(diff: SchemaDiff,
                 grouping_columns.add(col.upper())
 
     for change in diff.changes:
-        if (change.object_type == 'COLUMN' and 
+        if (change.object_type == 'COLUMN' and
             change.change_type == 'REMOVED' and
             change.column_name.upper() in grouping_columns):
             findings.append(Finding(
@@ -222,8 +224,6 @@ def rule_grain_change(diff: SchemaDiff,
                     "of downstream results."
                 )
             ))
-    return findings
-
     return findings
 
 ALL_RULES = [

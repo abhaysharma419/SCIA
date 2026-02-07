@@ -5,6 +5,7 @@ from scia.sql.ddl_parser import (
     extract_table_references,
     parse_ddl_to_schema,
 )
+from scia.models.schema import TableSchema, ColumnSchema
 
 
 def test_parse_create_table_simple():
@@ -180,3 +181,65 @@ def test_extract_table_references_invalid_sql():
 
     # Should return empty list without raising
     assert isinstance(tables, list)
+
+
+def test_parse_comments_in_sql():
+    """Test that comments in SQL are ignored."""
+    ddl = """
+    -- This is a comment
+    CREATE TABLE users (
+        user_id INTEGER /* inline comment */,
+        name VARCHAR(100) -- another comment
+    );
+    """
+    schemas = parse_ddl_to_schema(ddl)
+    assert len(schemas) == 1
+    assert len(schemas[0].columns) == 2
+
+
+def test_parse_case_insensitivity():
+    """Test that keywords are case-insensitive."""
+    ddl = "create table Users (User_Id integer, NAME varchar)"
+    schemas = parse_ddl_to_schema(ddl)
+    assert schemas[0].table_name == 'USERS'
+    assert schemas[0].columns[0].column_name == 'USER_ID'
+    assert schemas[0].columns[1].column_name == 'NAME'
+
+
+def test_parse_alter_table_add_column_with_base():
+    """Test parsing ALTER TABLE ADD COLUMN using base schemas."""
+    base_schema = [
+        TableSchema(schema_name="S", table_name="T1", columns=[
+            ColumnSchema(schema_name="S", table_name="T1", column_name="ID", data_type="INT", is_nullable=True, ordinal_position=1)
+        ])
+    ]
+    ddl = "ALTER TABLE S.T1 ADD COLUMN NEW_COL VARCHAR"
+    schemas = parse_ddl_to_schema(ddl, base_schemas=base_schema)
+    
+    assert len(schemas) == 1
+    assert len(schemas[0].columns) == 2
+    assert "NEW_COL" in [c.column_name for c in schemas[0].columns]
+
+
+def test_parse_alter_table_rename_column():
+    """Test parsing ALTER TABLE RENAME COLUMN."""
+    base_schema = [
+        TableSchema(schema_name="S", table_name="T1", columns=[
+            ColumnSchema(schema_name="S", table_name="T1", column_name="OLD_NAME", data_type="INT", is_nullable=True, ordinal_position=1)
+        ])
+    ]
+    ddl = "ALTER TABLE S.T1 RENAME COLUMN OLD_NAME TO NEW_NAME"
+    schemas = parse_ddl_to_schema(ddl, base_schemas=base_schema)
+    
+    assert len(schemas) == 1
+    assert schemas[0].columns[0].column_name == "NEW_NAME"
+
+
+def test_parse_very_long_identifiers():
+    """Test that very long identifiers are handled."""
+    long_name = "A" * 128
+    ddl = f"CREATE TABLE {long_name} ({long_name} INTEGER)"
+    schemas = parse_ddl_to_schema(ddl)
+    
+    assert schemas[0].table_name == long_name.upper()
+    assert schemas[0].columns[0].column_name == long_name.upper()

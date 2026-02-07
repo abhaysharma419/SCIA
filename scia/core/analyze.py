@@ -1,4 +1,5 @@
 """Schema change analysis and risk assessment."""
+import logging
 from typing import Dict, List, Optional
 
 from scia.core.diff import diff_schemas
@@ -9,6 +10,8 @@ from scia.models.finding import EnrichedFinding, ImpactDetail
 from scia.models.schema import TableSchema
 from scia.sql.heuristics import extract_signals
 from scia.warehouse.base import WarehouseAdapter
+
+logger = logging.getLogger(__name__)
 
 async def analyze(
     before_schema: List[TableSchema],
@@ -48,12 +51,18 @@ async def analyze(
         for finding in findings:
             # If finding is linked to a table, analyze impact
             table_name = finding.evidence.get("table")
+            # Also check for 'schema' to build fully qualified name if needed
+            schema_name = finding.evidence.get("schema")
+
             if table_name:
+                lookup_name = f"{schema_name}.{table_name}" if schema_name else table_name
+                logger.debug("Found table %s in finding %s", lookup_name, finding.finding_type)
+
                 downstream = await analyze_downstream(
-                    table_name, warehouse_adapter, max_depth=max_dependency_depth
+                    lookup_name, warehouse_adapter, max_depth=max_dependency_depth
                 )
-                upstream = await analyze_upstream(table_name, warehouse_adapter)
-                
+                upstream = await analyze_upstream(lookup_name, warehouse_adapter)
+
                 impact = ImpactDetail(
                     direct_dependents=downstream,
                     transitive_dependents=[],
@@ -61,7 +70,7 @@ async def analyze(
                     affected_applications=[],
                     estimated_blast_radius=len(downstream)
                 )
-                
+
                 # Adjust risk score based on blast radius
                 # If no dependents found, reduce risk by 25% (as per user preference)
                 adjusted_score = finding.risk_score

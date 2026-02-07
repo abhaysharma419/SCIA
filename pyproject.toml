@@ -25,3 +25,10 @@ scia = "scia.cli.main:main"
 
 [tool.setuptools]
 packages = ["scia", "scia.cli", "scia.config", "scia.core", "scia.input", "scia.metadata", "scia.models", "scia.output", "scia.sql", "scia.warehouse"]
+
+[tool.coverage.run]
+omit = [
+    "scia/warehouse/databricks.py",
+    "scia/warehouse/postgres.py",
+    "scia/warehouse/redshift.py",
+]

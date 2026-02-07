@@ -37,7 +37,7 @@ class Finding(BaseModel):
     confidence: Optional[float] = 1.0
     description: str
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any) -> None:  # pylint: disable=arguments-differ
         if self.risk_score is None:
             self.risk_score = self.base_risk
 

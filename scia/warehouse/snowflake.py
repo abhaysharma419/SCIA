@@ -19,7 +19,7 @@ class SnowflakeAdapter(WarehouseAdapter):
 
     def _resolve_context(self, cursor, database: str, schema: str):
         """Resolve database and schema names.
-        
+
         If not provided, fetch current context from session.
         """
         target_database = database
@@ -30,7 +30,7 @@ class SnowflakeAdapter(WarehouseAdapter):
             default_db, default_schema = cursor.fetchone()
             target_database = target_database or default_db
             target_schema = target_schema or (default_schema if default_schema else "PUBLIC")
-        
+
         return target_database, target_schema
 
     def connect(self, config: Dict[str, Any]) -> None:
@@ -74,7 +74,7 @@ class SnowflakeAdapter(WarehouseAdapter):
 
             # Resolve database and schema names
             target_database, target_schema = self._resolve_context(cursor, database, schema)
-            
+
             if not target_database:
                 logger.warning("No database specified or found for schema fetch.")
                 return []
@@ -147,10 +147,10 @@ class SnowflakeAdapter(WarehouseAdapter):
 
         try:
             cursor = self.conn.cursor()
-            
+
             # Resolve database and schema names
             target_database, target_schema = self._resolve_context(cursor, database, schema)
-            
+
             if not target_database:
                 logger.warning("No database specified or found for views fetch.")
                 return {}
@@ -188,21 +188,21 @@ class SnowflakeAdapter(WarehouseAdapter):
 
         try:
             cursor = self.conn.cursor()
-            
+
             # Resolve database and schema names
             target_database, target_schema = self._resolve_context(cursor, database, schema)
 
             if not target_database:
                 logger.warning("No database specified or found for foreign key fetch.")
                 return []
-            
-            # In Snowflake, SHOW IMPORTED KEYS IN SCHEMA <db>.<schema> is the most reliable way 
+
+            # In Snowflake, SHOW IMPORTED KEYS IN SCHEMA <db>.<schema> is the most reliable way
             # to get foreign keys with their respective columns.
             query = f"SHOW IMPORTED KEYS IN SCHEMA {target_database}.{target_schema}"
 
             logger.debug("Executing foreign key query: %s", query)
             cursor.execute(query)
-            
+
             # Fetch all rows and map them to the expected format
             # Column indices for SHOW IMPORTED KEYS:
             # 2: pk_table_name, 3: pk_column_name, 6: fk_table_name, 7: fk_column_name, 11: fk_name
