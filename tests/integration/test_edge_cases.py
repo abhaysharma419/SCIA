@@ -72,10 +72,16 @@ async def test_deep_dependency_chain(tmp_path, capsys):
     before = tmp_path / "before.json"
     after = tmp_path / "after.json"
     schema = [TableSchema(schema_name="S", table_name="T1", columns=[
-        ColumnSchema(schema_name="S", table_name="T1", column_name="C1", data_type="INT", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name="T1", column_name="C1",
+            data_type="INT", is_nullable=True, ordinal_position=1
+        )
     ])]
     schema_after = [TableSchema(schema_name="S", table_name="OTHER", columns=[
-        ColumnSchema(schema_name="S", table_name="OTHER", column_name="C1", data_type="INT", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name="OTHER", column_name="C1",
+            data_type="INT", is_nullable=True, ordinal_position=1
+        )
     ])]
     before.write_text(json.dumps([s.model_dump() for s in schema]), encoding="utf-8")
     after.write_text(json.dumps([s.model_dump() for s in schema_after]), encoding="utf-8")
@@ -160,10 +166,16 @@ async def test_special_characters_identifiers(tmp_path, capsys):
     col_name = '"Col-With-Dash"'
 
     schema = [TableSchema(schema_name="S", table_name=table_name, columns=[
-        ColumnSchema(schema_name="S", table_name=table_name, column_name=col_name, data_type="INT", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name=table_name, column_name=col_name,
+            data_type="INT", is_nullable=True, ordinal_position=1
+        )
     ])]
     schema_after = [TableSchema(schema_name="S", table_name=table_name, columns=[
-        ColumnSchema(schema_name="S", table_name=table_name, column_name=col_name, data_type="STRING", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name=table_name, column_name=col_name,
+            data_type="STRING", is_nullable=True, ordinal_position=1
+        )
     ])]
 
     before.write_text(json.dumps([s.model_dump() for s in schema]), encoding="utf-8")
@@ -231,12 +243,21 @@ async def test_multiple_high_risk_aggregation(tmp_path, capsys):
     after = tmp_path / "after_high.json"
 
     s_before = [TableSchema(schema_name="S", table_name="T1", columns=[
-        ColumnSchema(schema_name="S", table_name="T1", column_name="C1", data_type="INT", is_nullable=True, ordinal_position=1),
-        ColumnSchema(schema_name="S", table_name="T1", column_name="C2", data_type="INT", is_nullable=True, ordinal_position=2)
+        ColumnSchema(
+            schema_name="S", table_name="T1", column_name="C1",
+            data_type="INT", is_nullable=True, ordinal_position=1
+        ),
+        ColumnSchema(
+            schema_name="S", table_name="T1", column_name="C2",
+            data_type="INT", is_nullable=True, ordinal_position=2
+        )
     ])]
 
     s_after = [TableSchema(schema_name="S", table_name="T1", columns=[
-        ColumnSchema(schema_name="S", table_name="T1", column_name="C1", data_type="VARCHAR", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name="T1", column_name="C1",
+            data_type="VARCHAR", is_nullable=True, ordinal_position=1
+        )
         # C2 is dropped
     ])]
 
@@ -255,7 +276,7 @@ async def test_multiple_high_risk_aggregation(tmp_path, capsys):
     assert len(data["findings"]) >= 2
     # Score should be accumulated significantly
     assert data["risk_score"] > 0
-    # Classification should reflect the highest severity found (likely HIGH or MEDIUM depending on exact rules config)
+    # Classification should reflect the highest severity found
     assert data["classification"] in ["HIGH", "MEDIUM"]
 
 @pytest.mark.asyncio
@@ -265,7 +286,10 @@ async def test_mixed_input_json_sql(tmp_path, capsys):
     after = tmp_path / "after_mix.sql"
 
     s_before = [TableSchema(schema_name="S", table_name="T1", columns=[
-        ColumnSchema(schema_name="S", table_name="T1", column_name="C1", data_type="INT", is_nullable=True, ordinal_position=1)
+        ColumnSchema(
+            schema_name="S", table_name="T1", column_name="C1",
+            data_type="INT", is_nullable=True, ordinal_position=1
+        )
     ])]
 
     # SQL adds a column
