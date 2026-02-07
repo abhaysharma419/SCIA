@@ -1,0 +1,16 @@
+{
+    "risk_score": 80,
+    "classification": "HIGH",
+    "findings": [
+        {
+            "finding_type": "COLUMN_REMOVED",
+            "severity": "HIGH",
+            "base_risk": 80,
+            "evidence": {
+                "table": "customers",
+                "column": "email"
+            },
+            "description": "Column 'email' removed from table 'customers'."
+        }
+    ]
+}

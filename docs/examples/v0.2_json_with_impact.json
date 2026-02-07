@@ -1,0 +1,60 @@
+{
+    "risk_score": 120,
+    "classification": "HIGH",
+    "findings": [
+        {
+            "finding_type": "COLUMN_REMOVED",
+            "severity": "HIGH",
+            "base_risk": 80,
+            "evidence": {
+                "table": "customers",
+                "column": "email"
+            },
+            "description": "Column 'email' removed from table 'customers'.",
+            "impact_detail": {
+                "direct_dependents": [
+                    {
+                        "object_type": "VIEW",
+                        "name": "customer_emails",
+                        "schema": "analytics",
+                        "is_critical": true
+                    }
+                ],
+                "transitive_dependents": [
+                    {
+                        "object_type": "VIEW",
+                        "name": "marketing_contacts",
+                        "schema": "analytics",
+                        "is_critical": false
+                    }
+                ],
+                "affected_applications": [],
+                "estimated_blast_radius": 2
+            }
+        },
+        {
+            "finding_type": "JOIN_KEY_CHANGED",
+            "severity": "HIGH",
+            "base_risk": 40,
+            "evidence": {
+                "table": "orders",
+                "column": "customer_id",
+                "change": "type_changed"
+            },
+            "description": "Column 'customer_id' used in JOIN operations has changed type.",
+            "impact_detail": {
+                "direct_dependents": [
+                    {
+                        "object_type": "VIEW",
+                        "name": "order_summary",
+                        "schema": "analytics",
+                        "is_critical": true
+                    }
+                ],
+                "transitive_dependents": [],
+                "affected_applications": [],
+                "estimated_blast_radius": 1
+            }
+        }
+    ]
+}
