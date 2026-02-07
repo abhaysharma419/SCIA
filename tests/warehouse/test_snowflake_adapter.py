@@ -47,9 +47,9 @@ def test_snowflake_adapter_fetch_schema_success(adapter):
     # Mock connection and cursor
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = [
-        ('PUBLIC', 'USERS', 'USER_ID', 'INTEGER', 'NO', 1),
-        ('PUBLIC', 'USERS', 'NAME', 'VARCHAR', 'YES', 2),
-        ('PUBLIC', 'ORDERS', 'ORDER_ID', 'INTEGER', 'NO', 1),
+        ('PROD', 'PUBLIC', 'USERS', 'USER_ID', 'INTEGER', 'NO', 1),
+        ('PROD', 'PUBLIC', 'USERS', 'NAME', 'VARCHAR', 'YES', 2),
+        ('PROD', 'PUBLIC', 'ORDERS', 'ORDER_ID', 'INTEGER', 'NO', 1),
     ]
 
     mock_conn = MagicMock()
