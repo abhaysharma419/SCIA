@@ -133,7 +133,10 @@ def _handle_exit_code(fail_on, classification):
 
 
 def _get_warehouse_adapter(warehouse_type, conn_file):
-    """Get warehouse adapter with improved error messages."""
+    """Get warehouse adapter with improved error messages.
+    
+    Returns None on failure to allow graceful degradation.
+    """
     if not warehouse_type:
         return None
     try:
@@ -143,24 +146,26 @@ def _get_warehouse_adapter(warehouse_type, conn_file):
         return adapter
     except NotImplementedError:
         print(
-            f"Error: {warehouse_type.capitalize()} adapter not yet implemented.\n"
+            f"Warning: {warehouse_type.capitalize()} adapter not yet implemented.\n"
             f"Currently supported: snowflake\n"
-            f"Planned: databricks, postgres, redshift",
+            f"Planned: databricks, postgres, redshift\n"
+            f"Analysis will continue with schema-based rules only.",
             file=sys.stderr
         )
-        sys.exit(1)
+        return None
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Warning: {e}", file=sys.stderr)
+        return None
     except Exception as e:  # pylint: disable=broad-except
         print(
-            f"Error: Connection failed to {warehouse_type}.\n"
+            f"Warning: Failed to connect to {warehouse_type}.\n"
             f"Details: {e}\n"
             f"Check your connection config at ~/.scia/{warehouse_type}.yaml "
-            f"or provide --conn-file.",
+            f"or provide --conn-file.\n"
+            f"Analysis will continue with schema-based rules only.",
             file=sys.stderr
         )
-        sys.exit(1)
+        return None
 
 
 def _validate_args(args, input_type):
