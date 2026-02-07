@@ -1,7 +1,7 @@
 """Risk assessment and classification."""
 from typing import List, Optional
 
-from scia.models.finding import Finding
+from scia.models.finding import Finding, Severity
 
 class RiskAssessment:  # pylint: disable=too-few-public-methods
     """Aggregate findings into risk classification."""
@@ -30,8 +30,17 @@ class RiskAssessment:  # pylint: disable=too-few-public-methods
         """Classify risk based on normalized 0-100 score."""
         if score < 15:
             return "LOW"
+        
+        # Check if any finding has HIGH severity
+        has_high_finding = any(f.severity == Severity.HIGH for f in self.findings)
+        
         if score < 40:
             return "MEDIUM"
+        
+        # If score >= 40 but no individual HIGH finding, cap at MEDIUM
+        if not has_high_finding:
+            return "MEDIUM"
+            
         return "HIGH"
 
     def to_dict(self):

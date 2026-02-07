@@ -1,6 +1,6 @@
 from scia.core.rules import (
     rule_column_removed, rule_column_type_changed, rule_nullability_changed,
-    rule_join_key_changed, rule_grain_change, rule_potential_breakage,
+    rule_join_key_changed, rule_grain_change,
     rule_schema_removed, rule_schema_added, rule_table_removed, rule_table_added,
     apply_rules
 )
@@ -151,9 +151,9 @@ def test_rule_grain_change_applies(schema_diff_factory, column_factory):
     assert len(findings) == 1
     assert findings[0].finding_type == "GRAIN_CHANGE"
 
-def test_rule_potential_breakage_type_change(schema_diff_factory, column_factory):
-    """Test function."""
-    col_b = column_factory(column_name="REVENUE", data_type="DECIMAL(10,2)")
+def test_rule_column_type_changed_with_signals(schema_diff_factory, column_factory):
+    """Test column type change with SQL signals."""
+    col_b = column_factory(column_name="REVENUE", data_type="DECIMAL")
     col_a = column_factory(column_name="REVENUE", data_type="FLOAT")
     diff = schema_diff_factory(changes=[
         SchemaChange(object_type="COLUMN", schema_name="S", table_name="T", column_name="REVENUE", 
@@ -163,9 +163,10 @@ def test_rule_potential_breakage_type_change(schema_diff_factory, column_factory
     mock_metadata.columns = {"REVENUE"}
     sql_signals = {"q": mock_metadata}
     
-    findings = rule_potential_breakage(diff, sql_signals=sql_signals)
+    findings = rule_column_type_changed(diff, sql_signals=sql_signals)
     assert len(findings) == 1
-    assert findings[0].finding_type == "POTENTIAL_BREAKAGE"
+    assert findings[0].base_risk == 50
+
 
 def test_apply_rules_with_sql_signals(schema_diff_factory, column_factory):
     """Test function."""
