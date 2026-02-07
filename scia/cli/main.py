@@ -70,7 +70,6 @@ async def run_analyze(args):
             after_schema = load_schema_file(args.after)
         
         elif input_type == InputType.SQL:
-            # Handle Before
             if metadata['before_format'] == 'sql':
                 with open(args.before, 'r', encoding='utf-8') as f:
                     before_schema = parse_ddl_to_schema(f.read())
@@ -83,7 +82,7 @@ async def run_analyze(args):
             if metadata['after_format'] == 'sql':
                 with open(args.after, 'r', encoding='utf-8') as f:
                     sql_content = f.read()
-                    after_schema = parse_ddl_to_schema(sql_content)
+                    after_schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
                     sql_definitions = {"migration": sql_content}
             elif metadata['after_format'] == 'database' and warehouse_adapter:
                 after_schema = _fetch_schema_from_db(args.after, warehouse_adapter)
