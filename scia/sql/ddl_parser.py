@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_ddl_to_schema(
-    ddl_sql: str, 
+    ddl_sql: str,
     base_schemas: Optional[List[TableSchema]] = None
 ) -> List[TableSchema]:
     """Parse CREATE TABLE and ALTER TABLE DDL statements to schema objects.
@@ -71,18 +71,10 @@ def parse_ddl_to_schema(
 
 
 def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
-    """Extract TableSchema from CREATE TABLE statement.
-
-    Args:
-        stmt: sqlglot Create expression
-
-    Returns:
-        TableSchema object or None if extraction fails
-    """
+    """Extract TableSchema from CREATE TABLE statement."""
     try:
         # In sqlglot, CREATE TABLE has 'this' which is a Schema
         schema_def = stmt.args.get('this')
-
         if not isinstance(schema_def, exp.Schema):
             logger.debug("No schema definition found in CREATE TABLE")
             return None
@@ -93,59 +85,73 @@ def _handle_create_table(stmt: exp.Create) -> Optional[TableSchema]:
             logger.debug("No table definition found in CREATE TABLE")
             return None
 
-        table_name = table_schema.this.name if hasattr(table_schema.this, 'name') else str(table_schema.this)
-
-        schema_name = table_schema.db
-        if not schema_name:
-            schema_name = 'PUBLIC'
-
-        database_name = table_schema.catalog
-
-        # If schema_name is an expression, get the name
-        if hasattr(schema_name, 'name'):
-            schema_name = schema_name.name
-
-        # Double check in case name was empty
-        if not schema_name:
-            schema_name = 'PUBLIC'
-
-        if str(schema_name).upper() == 'NONE':
-            schema_name = 'PUBLIC'
-
-        # Clean up database name if it's an expression
-        db_name = None
-        if database_name:
-            db_name = database_name.name if hasattr(database_name, 'name') else str(database_name)
-
-        if not table_name:
-            logger.debug("No table name found in CREATE TABLE")
+        table_context = _extract_table_context(table_schema)
+        if not table_context:
             return None
 
-        # Extract columns from schema expressions
-        columns = []
-        ordinal_pos = 1
+        table_name, schema_name, db_name = table_context
 
-        for col_expr in schema_def.expressions:
-            if isinstance(col_expr, exp.ColumnDef):
-                col = _extract_column_from_columndef(col_expr, schema_name.upper(), table_name.upper(), ordinal_pos, db_name=db_name)
-                if col:
-                    columns.append(col)
-                    ordinal_pos += 1
+        # Extract columns from schema expressions
+        columns = _extract_columns_from_schema(schema_def, schema_name, table_name, db_name)
 
         if not columns:
             logger.warning("CREATE TABLE %s has no columns", table_name)
             return None
 
         return TableSchema(
-            database_name=db_name.upper() if db_name else None,
-            schema_name=schema_name.upper(),
-            table_name=table_name.upper(),
+            database_name=db_name,
+            schema_name=schema_name,
+            table_name=table_name,
             columns=columns
         )
 
     except Exception as e:  # pylint: disable=broad-except
         logger.warning("Failed to extract CREATE TABLE: %s", e)
         return None
+
+def _extract_table_context(table_schema: exp.Table):
+    """Extract table name, schema, and db from table expression."""
+    if hasattr(table_schema.this, 'name'):
+        table_name = table_schema.this.name
+    else:
+        table_name = str(table_schema.this)
+
+    if not table_name:
+        logger.debug("No table name found in CREATE TABLE")
+        return None
+
+    schema_name = table_schema.db
+    if hasattr(schema_name, 'name'):
+        schema_name = schema_name.name
+    if not schema_name or str(schema_name).upper() == 'NONE':
+        schema_name = 'PUBLIC'
+
+    target_db_name = None
+    database_name = table_schema.catalog
+    if database_name:
+        target_db_name = (
+            database_name.name if hasattr(database_name, 'name')
+            else str(database_name)
+        )
+        target_db_name = target_db_name.upper()
+
+    return table_name.upper(), schema_name.upper(), target_db_name
+
+def _extract_columns_from_schema(schema_def, schema_name, table_name, db_name):
+    """Extract list of ColumnSchema from schema definition."""
+    columns = []
+    ordinal_pos = 1
+
+    for col_expr in schema_def.expressions:
+        if isinstance(col_expr, exp.ColumnDef):
+            col = _extract_column_from_columndef(
+                col_expr, schema_name, table_name,
+                ordinal_pos, db_name=db_name
+            )
+            if col:
+                columns.append(col)
+                ordinal_pos += 1
+    return columns
 
 
 def _extract_column_from_columndef(
@@ -208,6 +214,93 @@ def _extract_column_from_columndef(
         return None
 
 
+def _handle_alter_actions(
+    stmt: exp.Alter,
+    table_schema: TableSchema,
+    schema_name: str,
+    table_name: str
+) -> None:
+    """Process specific actions within an ALTER TABLE statement."""
+    for action in stmt.args.get('actions', []):
+        if isinstance(action, exp.ColumnDef):
+            _handle_add_column(action, table_schema, schema_name, table_name)
+        elif isinstance(action, exp.Drop) and action.args.get('kind') == 'COLUMN':
+            _handle_drop_column(action, table_schema)
+        elif isinstance(action, exp.RenameColumn):
+            _handle_rename_column(action, table_schema)
+        elif isinstance(action, exp.AlterColumn):
+            _handle_modify_column(action, table_schema)
+
+
+def _handle_add_column(
+    action: exp.ColumnDef,
+    table_schema: TableSchema,
+    schema_name: str,
+    table_name: str
+) -> None:
+    """Handle ADD COLUMN action."""
+    new_col = _extract_column_from_columndef(
+        action, schema_name, table_name, len(table_schema.columns) + 1
+    )
+    if new_col:
+        table_schema.columns.append(new_col)
+
+
+def _handle_drop_column(action: exp.Drop, table_schema: TableSchema) -> None:
+    """Handle DROP COLUMN action."""
+    col_name = action.this.name.upper()
+    table_schema.columns = [
+        c for c in table_schema.columns
+        if c.column_name.upper() != col_name
+    ]
+
+
+def _handle_rename_column(action: exp.RenameColumn, table_schema: TableSchema) -> None:
+    """Handle RENAME COLUMN action."""
+    old_name = action.this.name.upper()
+    new_name = action.args.get('to').name.upper()
+    for col in table_schema.columns:
+        if col.column_name.upper() == old_name:
+            col.column_name = new_name
+
+
+def _handle_modify_column(action: exp.AlterColumn, table_schema: TableSchema) -> None:
+    """Handle MODIFY/ALTER COLUMN action."""
+    col_name = action.this.name.upper()
+    for col in table_schema.columns:
+        if col.column_name.upper() == col_name:
+            # Update type if provided
+            dtype = action.args.get('dtype')
+            if dtype:
+                col.data_type = dtype.sql(dialect='snowflake').upper()
+
+            # Update nullability if provided
+            allow_null = action.args.get('allow_null')
+            if allow_null is not None:
+                col.is_nullable = bool(allow_null)
+
+
+def _get_table_key(stmt: exp.Alter) -> tuple:
+    """Extract schema and table name key from ALTER statement."""
+    table_expr = stmt.this
+    if not isinstance(table_expr, exp.Table):
+        return None, None
+
+    # Extract table and schema names robustly
+    if hasattr(table_expr.this, 'name'):
+        table_name = table_expr.this.name
+    else:
+        table_name = str(table_expr.this)
+
+    schema_name = table_expr.db
+    if hasattr(schema_name, 'name'):
+        schema_name = schema_name.name
+    if not schema_name or str(schema_name).upper() == 'NONE':
+        schema_name = 'PUBLIC'
+
+    return schema_name.upper(), table_name.upper()
+
+
 def _handle_alter_table(
     stmt: exp.Alter,
     schemas: dict
@@ -217,101 +310,20 @@ def _handle_alter_table(
     Supports: ADD COLUMN, DROP COLUMN, MODIFY COLUMN, RENAME COLUMN
     """
     try:
-        table_expr = stmt.this
-        if not isinstance(table_expr, exp.Table):
+        schema_name, table_name = _get_table_key(stmt)
+        if not schema_name or not table_name:
             return
 
-        # Extract table and schema names robustly
-        table_name = table_expr.this.name if hasattr(table_expr.this, 'name') else str(table_expr.this)
-
-        schema_name = table_expr.db
-        if hasattr(schema_name, 'name'):
-            schema_name = schema_name.name
-        if not schema_name or str(schema_name).upper() == 'NONE':
-            schema_name = 'PUBLIC'
-
-        table_name = table_name.upper()
-        schema_name = schema_name.upper()
         key = (schema_name, table_name)
 
         if key not in schemas:
             logger.debug("Table %s.%s not found for ALTER", schema_name, table_name)
             return
 
-        table_schema = schemas[key]
-
-        # Handle different ALTER actions
-        for action in stmt.args.get('actions', []):
-            # ADD COLUMN
-            if isinstance(action, exp.ColumnDef):
-                new_col = _extract_column_from_columndef(
-                    action, schema_name, table_name, len(table_schema.columns) + 1
-                )
-                if new_col:
-                    table_schema.columns.append(new_col)
-
-            # DROP COLUMN
-            elif isinstance(action, exp.Drop) and action.args.get('kind') == 'COLUMN':
-                col_name = action.this.name.upper()
-                table_schema.columns = [c for c in table_schema.columns if c.column_name.upper() != col_name]
-
-            # RENAME COLUMN
-            elif isinstance(action, exp.RenameColumn):
-                old_name = action.this.name.upper()
-                new_name = action.args.get('to').name.upper()
-                for col in table_schema.columns:
-                    if col.column_name.upper() == old_name:
-                        col.column_name = new_name
-
-            # MODIFY COLUMN / ALTER COLUMN (Type change)
-            elif isinstance(action, exp.AlterColumn):
-                col_name = action.this.name.upper()
-                for col in table_schema.columns:
-                    if col.column_name.upper() == col_name:
-                        # Update type if provided
-                        dtype = action.args.get('dtype')
-                        if dtype:
-                            col.data_type = dtype.sql(dialect='snowflake').upper()
-
-                        # Update nullability if provided
-                        allow_null = action.args.get('allow_null')
-                        if allow_null is not None:
-                            col.is_nullable = bool(allow_null)
+        _handle_alter_actions(stmt, schemas[key], schema_name, table_name)
 
     except Exception as e:  # pylint: disable=broad-except
         logger.warning("Failed to parse ALTER TABLE: %s", e)
 
 
-def extract_table_references(sql: str, dialect: str = 'snowflake') -> List[str]:
-    """Extract all table references from a SQL query.
 
-    Args:
-        sql: SQL query text
-        dialect: SQL dialect (default: snowflake)
-
-    Returns:
-        List of table names referenced in qualified format (schema.table or just table).
-        Empty list if parsing fails.
-    """
-    try:
-        statements = sqlglot.parse(sql, read=dialect)
-        tables = set()
-
-        for stmt in statements:
-            if not stmt:
-                continue
-
-            for table in stmt.find_all(exp.Table):
-                # Get fully qualified table name
-                if hasattr(table, 'db') and table.db:
-                    qualified_name = f"{table.db}.{table.name}".upper()
-                else:
-                    qualified_name = table.name.upper()
-
-                tables.add(qualified_name)
-
-        return sorted(list(tables))
-
-    except Exception as e:  # pylint: disable=broad-except
-        logger.warning("Failed to extract table references: %s", e)
-        return []

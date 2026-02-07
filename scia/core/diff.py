@@ -47,57 +47,83 @@ def diff_schemas(before: List[TableSchema], after: List[TableSchema]) -> SchemaD
     all_schema_names = set(before_schemas.keys()) | set(after_schemas.keys())
 
     for schema_name in all_schema_names:
-        b_tables = before_schemas.get(schema_name)
-        a_tables = after_schemas.get(schema_name)
-
-        if b_tables and not a_tables:
-            all_changes.append(SchemaChange(
-                object_type='SCHEMA',
-                schema_name=schema_name,
-                change_type='REMOVED'
-            ))
-            continue
-
-        if not b_tables and a_tables:
-            all_changes.append(SchemaChange(
-                object_type='SCHEMA',
-                schema_name=schema_name,
-                change_type='ADDED'
-            ))
-            continue
-
-        # 2. Table Level Comparison (if schema exists in both)
-        before_table_map = {t.table_name: t for t in b_tables}
-        after_table_map = {t.table_name: t for t in a_tables}
-
-        all_table_names = set(before_table_map.keys()) | set(after_table_map.keys())
-
-        for table_name in all_table_names:
-            b_table = before_table_map.get(table_name)
-            a_table = after_table_map.get(table_name)
-
-            if b_table and not a_table:
-                all_changes.append(SchemaChange(
-                    object_type='TABLE',
-                    schema_name=schema_name,
-                    table_name=table_name,
-                    change_type='REMOVED'
-                ))
-                continue
-
-            if not b_table and a_table:
-                all_changes.append(SchemaChange(
-                    object_type='TABLE',
-                    schema_name=schema_name,
-                    table_name=table_name,
-                    change_type='ADDED'
-                ))
-                continue
-
-            # 3. Column Level Comparison (if table exists in both)
-            _process_column_level_diff(schema_name, table_name, b_table, a_table, all_changes)
+        _process_schema_level_diff(
+            schema_name,
+            before_schemas.get(schema_name),
+            after_schemas.get(schema_name),
+            all_changes
+        )
 
     return SchemaDiff(changes=all_changes)
+
+
+def _process_schema_level_diff(
+    schema_name: str,
+    b_tables: Optional[List[TableSchema]],
+    a_tables: Optional[List[TableSchema]],
+    all_changes: list
+) -> None:
+    """Process differences at the schema level and drill down to tables."""
+    if b_tables and not a_tables:
+        all_changes.append(SchemaChange(
+            object_type='SCHEMA',
+            schema_name=schema_name,
+            change_type='REMOVED'
+        ))
+        return
+
+    if not b_tables and a_tables:
+        all_changes.append(SchemaChange(
+            object_type='SCHEMA',
+            schema_name=schema_name,
+            change_type='ADDED'
+        ))
+        return
+
+    # 2. Table Level Comparison (if schema exists in both)
+    before_table_map = {t.table_name: t for t in b_tables}
+    after_table_map = {t.table_name: t for t in a_tables}
+
+    all_table_names = set(before_table_map.keys()) | set(after_table_map.keys())
+
+    for table_name in all_table_names:
+        _process_table_level_diff(
+            schema_name,
+            table_name,
+            before_table_map.get(table_name),
+            after_table_map.get(table_name),
+            all_changes
+        )
+
+
+def _process_table_level_diff(
+    schema_name: str,
+    table_name: str,
+    b_table: Optional[TableSchema],
+    a_table: Optional[TableSchema],
+    all_changes: list
+) -> None:
+    """Process differences at the table level and drill down to columns."""
+    if b_table and not a_table:
+        all_changes.append(SchemaChange(
+            object_type='TABLE',
+            schema_name=schema_name,
+            table_name=table_name,
+            change_type='REMOVED'
+        ))
+        return
+
+    if not b_table and a_table:
+        all_changes.append(SchemaChange(
+            object_type='TABLE',
+            schema_name=schema_name,
+            table_name=table_name,
+            change_type='ADDED'
+        ))
+        return
+
+    # 3. Column Level Comparison (if table exists in both)
+    _process_column_level_diff(schema_name, table_name, b_table, a_table, all_changes)
 
 def _process_column_level_diff(schema_name: str, table_name: str,
                              before_table: TableSchema, after_table: TableSchema,

@@ -45,111 +45,155 @@ async def run_analyze(args):
         # Resolve optional arguments that might be missing in diff command
         warehouse_type = getattr(args, 'warehouse', None)
         conn_file = getattr(args, 'conn_file', None) # Corrected from 'conn-file'
-        dep_depth = getattr(args, 'dependency_depth', 3) # Corrected from 'dependency-depth'
-        include_up = getattr(args, 'include_upstream', True)
-        include_down = getattr(args, 'include_downstream', True)
-        output_format = getattr(args, 'format', 'json')
-        fail_on = getattr(args, 'fail_on', 'HIGH')
+        warehouse_type = getattr(args, 'warehouse', None)
+        conn_file = getattr(args, 'conn_file', None)
 
         # 1. Resolve input sources
         input_type, metadata = resolve_input(args.before, args.after, warehouse_type)
 
-        # 2. Initialize warehouse adapter if needed
-        if warehouse_type:
-            try:
-                config = load_connection_config(warehouse_type, conn_file)
-                warehouse_adapter = get_adapter(warehouse_type)
-                warehouse_adapter.connect(config)
-            except Exception as e:  # pylint: disable=broad-except
-                print(f"Warning: Failed to connect to {warehouse_type}: {e}", file=sys.stderr)
-                warehouse_adapter = None
+        # 2. Get Warehouse Adapter
+        warehouse_adapter = _get_warehouse_adapter(warehouse_type, conn_file)
 
-        before_schema = []
-        after_schema = []
-        sql_definitions = {}
-
-        # 3. Load schemas and SQL signals based on input type
-        if input_type == InputType.JSON:
-            before_schema = load_schema_file(args.before)
-            after_schema = load_schema_file(args.after)
-
-        elif input_type == InputType.SQL:
-            if metadata['before_format'] == 'sql':
-                try:
-                    with open(args.before, 'r', encoding='utf-8') as f:
-                        before_schema = parse_ddl_to_schema(f.read())
-                except Exception as e:  # pylint: disable=broad-except
-                    print(f"Warning: Failed to parse SQL in {args.before}: {e}", file=sys.stderr)
-                    before_schema = []
-            elif metadata['before_format'] == 'database' and warehouse_adapter:
-                before_schema = _fetch_schema_from_db(args.before, warehouse_adapter)
-            else:
-                before_schema = load_schema_file(args.before)
-
-            # Handle After
-            if metadata['after_format'] == 'sql':
-                try:
-                    with open(args.after, 'r', encoding='utf-8') as f:
-                        sql_content = f.read()
-                        after_schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
-                        sql_definitions = {"migration": sql_content}
-                except Exception as e:  # pylint: disable=broad-except
-                    print(f"Warning: Failed to parse SQL in {args.after}: {e}", file=sys.stderr)
-                    after_schema = before_schema  # Fallback to no change if parser fails
-            elif metadata['after_format'] == 'database' and warehouse_adapter:
-                after_schema = _fetch_schema_from_db(args.after, warehouse_adapter)
-            else:
-                after_schema = load_schema_file(args.after)
-
-        elif input_type == InputType.DATABASE:
-            if not warehouse_adapter:
-                # Should have been caught by resolve_input, but being safe
-                raise ValueError("Database mode requires --warehouse")
-            before_schema = _fetch_schema_from_db(metadata['before_source'], warehouse_adapter)
-            after_schema = _fetch_schema_from_db(metadata['after_source'], warehouse_adapter)
-
-        # 4. Extract database names for warning
-        warnings = []
-        before_db = before_schema[0].database_name if before_schema else None
-        after_db = after_schema[0].database_name if after_schema else None
-
-        if before_db and after_db and before_db.upper() != after_db.upper():
-            warnings.append(f"Database names are different: {before_db} vs {after_db}")
-
-        # 5. Execute Analysis
-        assessment = await analyze(
-            before_schema,
-            after_schema,
-            sql_definitions=sql_definitions if sql_definitions else None,
-            warehouse_adapter=warehouse_adapter if (
-                include_up or include_down
-            ) else None,
-            max_dependency_depth=dep_depth,
-            warnings=warnings
+        # 3. Load Schemas
+        before_schema, after_schema, sql_definitions = _load_schemas(
+            args, input_type, metadata, warehouse_adapter
         )
 
-        # 5. Output results
-        if output_format == "json":
-            print(render_json(assessment))
-        else:
-            print(render_markdown(assessment))
+        # 4. Warnings and Analysis
+        warnings = []
+        if before_schema and after_schema:
+            b_db = before_schema[0].database_name
+            a_db = after_schema[0].database_name
+            if b_db and a_db and b_db.upper() != a_db.upper():
+                warnings.append(f"Database names are different: {b_db} vs {a_db}")
 
-        # 6. Exit code logic
-        if fail_on == "HIGH" and assessment.classification == "HIGH":
-            sys.exit(1)
-        if fail_on == "MEDIUM" and assessment.classification in ["HIGH", "MEDIUM"]:
-            sys.exit(1)
-        if fail_on == "LOW" and assessment.classification in ["HIGH", "MEDIUM", "LOW"]:
-            sys.exit(1)
+        # 5. Execute Analysis & Output
+        analysis_config = {
+            'dep_depth': getattr(args, 'dependency_depth', 3),
+            'warnings': warnings,
+            'include_up': getattr(args, 'include_upstream', True),
+            'include_down': getattr(args, 'include_downstream', True),
+            'output_format': getattr(args, 'format', 'json'),
+            'fail_on': getattr(args, 'fail_on', 'HIGH')
+        }
+
+        await _execute_and_output(
+            before_schema, after_schema, sql_definitions,
+            warehouse_adapter, analysis_config
+        )
 
         sys.exit(0)
 
-    except Exception as e: # pylint: disable=broad-except
+    except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     finally:
         if warehouse_adapter:
             warehouse_adapter.close()
+
+
+async def _execute_and_output(
+        before_schema, after_schema, sql_definitions,
+        warehouse_adapter, config
+):
+    """Execute analysis and render output."""
+    assessment = await analyze(
+        before_schema,
+        after_schema,
+        sql_definitions=sql_definitions if sql_definitions else None,
+        warehouse_adapter=warehouse_adapter if (
+            config['include_up'] or config['include_down']
+        ) else None,
+        max_dependency_depth=config['dep_depth'],
+        warnings=config['warnings']
+    )
+
+    if config['output_format'] == "json":
+        print(render_json(assessment))
+    else:
+        print(render_markdown(assessment))
+
+    _handle_exit_code(config['fail_on'], assessment.classification)
+
+
+def _handle_exit_code(fail_on, classification):
+    code = 0
+    if fail_on == "HIGH" and classification == "HIGH":
+        code = 1
+    elif fail_on == "MEDIUM" and classification in ["HIGH", "MEDIUM"]:
+        code = 1
+    elif fail_on == "LOW" and classification in ["HIGH", "MEDIUM", "LOW"]:
+        code = 1
+    
+    if code != 0:
+        sys.exit(code)
+
+
+def _get_warehouse_adapter(warehouse_type, conn_file):
+    if not warehouse_type:
+        return None
+    try:
+        config = load_connection_config(warehouse_type, conn_file)
+        adapter = get_adapter(warehouse_type)
+        adapter.connect(config)
+        return adapter
+    except Exception as e:  # pylint: disable=broad-except
+        print(f"Warning: Failed to connect to {warehouse_type}: {e}", file=sys.stderr)
+        return None
+
+
+def _load_schemas(args, input_type, metadata, adapter):
+    before_schema = []
+    after_schema = []
+    sql_definitions = {}
+
+    if input_type == InputType.JSON:
+        before_schema = load_schema_file(args.before)
+        after_schema = load_schema_file(args.after)
+
+    elif input_type == InputType.SQL:
+        before_schema = _load_sql_before(args, metadata, adapter)
+        after_schema, sql_definitions = _load_sql_after(
+            args, metadata, adapter, before_schema
+        )
+
+    elif input_type == InputType.DATABASE:
+        if not adapter:
+            raise ValueError("Database mode requires --warehouse")
+        before_schema = _fetch_schema_from_db(metadata['before_source'], adapter)
+        after_schema = _fetch_schema_from_db(metadata['after_source'], adapter)
+
+    return before_schema, after_schema, sql_definitions
+
+
+def _load_sql_before(args, metadata, adapter):
+    if metadata['before_format'] == 'sql':
+        try:
+            with open(args.before, 'r', encoding='utf-8') as f:
+                return parse_ddl_to_schema(f.read())
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"Warning: Failed to parse SQL in {args.before}: {e}", file=sys.stderr)
+            return []
+    elif metadata['before_format'] == 'database' and adapter:
+        return _fetch_schema_from_db(args.before, adapter)
+    return load_schema_file(args.before)
+
+
+def _load_sql_after(args, metadata, adapter, before_schema):
+    sql_defs = {}
+    if metadata['after_format'] == 'sql':
+        try:
+            with open(args.after, 'r', encoding='utf-8') as f:
+                sql_content = f.read()
+                schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
+                sql_defs = {"migration": sql_content}
+                return schema, sql_defs
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"Warning: Failed to parse SQL in {args.after}: {e}", file=sys.stderr)
+            return before_schema, sql_defs
+    elif metadata['after_format'] == 'database' and adapter:
+        return _fetch_schema_from_db(args.after, adapter), sql_defs
+    return load_schema_file(args.after), sql_defs
 
 def main():
     """Parse command line arguments and execute appropriate command."""

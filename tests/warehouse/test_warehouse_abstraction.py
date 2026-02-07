@@ -1,4 +1,5 @@
 """Tests for warehouse abstraction layer."""
+# pylint: disable=abstract-class-instantiated
 import pytest
 
 from scia.warehouse.base import WarehouseAdapter
@@ -13,7 +14,7 @@ def test_warehouse_adapter_is_abstract():
 def test_warehouse_adapter_requires_connect():
     """Test that connect method must be implemented."""
     class IncompleteAdapter(WarehouseAdapter):
-        pass
+        """Adapter with no implementation."""
 
     with pytest.raises(TypeError):
         IncompleteAdapter()
@@ -22,6 +23,7 @@ def test_warehouse_adapter_requires_connect():
 def test_warehouse_adapter_requires_fetch_schema():
     """Test that fetch_schema method must be implemented."""
     class PartialAdapter(WarehouseAdapter):
+        """Adapter with partial implementation."""
         def connect(self, config):
             pass
         def fetch_views(self, database, schema):

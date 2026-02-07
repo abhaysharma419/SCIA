@@ -1,7 +1,9 @@
 """Tests for Snowflake warehouse adapter."""
+# pylint: disable=redefined-outer-name
 from unittest.mock import MagicMock, patch
 
 import pytest
+import snowflake.connector
 
 from scia.warehouse.snowflake import SnowflakeAdapter
 
@@ -33,7 +35,6 @@ def test_snowflake_adapter_connect_success(adapter):
 
 def test_snowflake_adapter_connect_failure(adapter):
     """Test connection failure handling."""
-    import snowflake.connector  # pylint: disable=import-error,no-name-in-module
 
     with patch('snowflake.connector.connect',
                side_effect=snowflake.connector.errors.Error("Connection failed")):
@@ -72,7 +73,6 @@ def test_snowflake_adapter_fetch_schema_no_connection(adapter):
 
 def test_snowflake_adapter_fetch_schema_failure(adapter):
     """Test schema fetch failure handling."""
-    import snowflake.connector  # pylint: disable=import-error,no-name-in-module
 
     mock_cursor = MagicMock()
     mock_cursor.execute.side_effect = snowflake.connector.errors.Error("Query failed")
@@ -121,7 +121,7 @@ def test_snowflake_adapter_fetch_foreign_keys_success(adapter):
     row[6] = 'ORDERS'
     row[7] = 'USER_ID'
     row[11] = 'FK_USER_ID'
-    
+
     mock_cursor.fetchall.return_value = [row]
 
     mock_conn = MagicMock()

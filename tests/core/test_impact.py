@@ -1,10 +1,11 @@
 """Tests for impact analysis component."""
+# pylint: disable=redefined-outer-name
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 from scia.core.impact import analyze_downstream, analyze_upstream
-from scia.models.finding import DependencyObject
-from scia.warehouse.base import WarehouseAdapter
+
 
 @pytest.fixture
 def mock_adapter():
