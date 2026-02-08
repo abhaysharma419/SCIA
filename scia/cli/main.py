@@ -44,12 +44,11 @@ async def run_analyze(args):
     try:
         # Resolve optional arguments that might be missing in diff command
         warehouse_type = getattr(args, 'warehouse', None)
-        conn_file = getattr(args, 'conn_file', None) # Corrected from 'conn-file'
-        warehouse_type = getattr(args, 'warehouse', None)
         conn_file = getattr(args, 'conn_file', None)
+        dialect = getattr(args, 'dialect', 'snowflake')
 
         # 1. Resolve input sources
-        input_type, metadata = resolve_input(args.before, args.after, warehouse_type)
+        input_type, metadata = resolve_input(args.before, args.after, warehouse_type, dialect)
 
         # 2. Validate arguments
         _validate_args(args, input_type)
@@ -208,15 +207,16 @@ def _load_schemas(args, input_type, metadata, adapter):
     before_schema = []
     after_schema = []
     sql_definitions = {}
+    dialect = metadata.get('dialect', 'snowflake')
 
     if input_type == InputType.JSON:
         before_schema = load_schema_file(args.before)
         after_schema = load_schema_file(args.after)
 
     elif input_type == InputType.SQL:
-        before_schema = _load_sql_before(args, metadata, adapter)
+        before_schema = _load_sql_before(args, metadata, adapter, dialect)
         after_schema, sql_definitions = _load_sql_after(
-            args, metadata, adapter, before_schema
+            args, metadata, adapter, before_schema, dialect
         )
 
     elif input_type == InputType.DATABASE:
@@ -232,11 +232,11 @@ def _load_schemas(args, input_type, metadata, adapter):
     return before_schema, after_schema, sql_definitions
 
 
-def _load_sql_before(args, metadata, adapter):
+def _load_sql_before(args, metadata, adapter, dialect='snowflake'):
     if metadata['before_format'] == 'sql':
         try:
             with open(args.before, 'r', encoding='utf-8') as f:
-                return parse_ddl_to_schema(f.read())
+                return parse_ddl_to_schema(f.read(), dialect=dialect)
         except Exception as e:  # pylint: disable=broad-except
             print(f"Warning: Failed to parse SQL in {args.before}: {e}", file=sys.stderr)
             return []
@@ -245,13 +245,13 @@ def _load_sql_before(args, metadata, adapter):
     return load_schema_file(args.before)
 
 
-def _load_sql_after(args, metadata, adapter, before_schema):
+def _load_sql_after(args, metadata, adapter, before_schema, dialect='snowflake'):
     sql_defs = {}
     if metadata['after_format'] == 'sql':
         try:
             with open(args.after, 'r', encoding='utf-8') as f:
                 sql_content = f.read()
-                schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema)
+                schema = parse_ddl_to_schema(sql_content, base_schemas=before_schema, dialect=dialect)
                 sql_defs = {"migration": sql_content}
                 return schema, sql_defs
         except Exception as e:  # pylint: disable=broad-except
@@ -291,6 +291,12 @@ def main():
         "--warehouse",
         choices=["snowflake", "databricks", "postgres", "redshift"],
         help="Warehouse type (required for DB mode, optional for enrichment). Currently supported: snowflake"
+    )
+    analyze_parser.add_argument(
+        "--dialect",
+        choices=["snowflake", "postgres", "mysql", "bigquery", "databricks", "redshift"],
+        default="snowflake",
+        help="SQL dialect for parsing SQL files (default: snowflake). Required when using SQL files without live database connection."
     )
     analyze_parser.add_argument(
         "--conn-file",

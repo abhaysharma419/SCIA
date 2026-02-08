@@ -100,6 +100,38 @@ def test_alter_table_modify_column_snowflake_syntax():
     assert len(updated_schemas) == 1
     assert updated_schemas[0].columns[0].data_type == "VARCHAR(255)"
 
+def test_alter_table_with_dialect_parameter():
+    """Test that dialect parameter is passed correctly to parser."""
+    base_schema = [
+        TableSchema(
+            schema_name="PUBLIC",
+            table_name="USERS",
+            columns=[
+                ColumnSchema(schema_name="PUBLIC", table_name="USERS", column_name="USERNAME", data_type="VARCHAR(100)", is_nullable=True, ordinal_position=1)
+            ]
+        )
+    ]
+    
+    # Snowflake dialect should convert MODIFY COLUMN
+    ddl = "ALTER TABLE users MODIFY COLUMN username VARCHAR(255)"
+    updated_schemas = parse_ddl_to_schema(ddl, base_schemas=base_schema, dialect='snowflake')
+    assert updated_schemas[0].columns[0].data_type == "VARCHAR(255)"
+    
+    # Reset schema
+    base_schema = [
+        TableSchema(
+            schema_name="PUBLIC",
+            table_name="USERS",
+            columns=[
+                ColumnSchema(schema_name="PUBLIC", table_name="USERS", column_name="USERNAME", data_type="VARCHAR(100)", is_nullable=True, ordinal_position=1)
+            ]
+        )
+    ]
+    
+    # Other dialects should not convert (no preprocessor registered)
+    updated_schemas = parse_ddl_to_schema(ddl, base_schemas=base_schema, dialect='postgres')
+    assert updated_schemas[0].columns[0].data_type == "VARCHAR(100)"
+
 def test_multiple_alter_statements():
     """Test multiple ALTER statements in one script."""
     base_schema = [
