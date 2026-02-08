@@ -141,7 +141,13 @@ Tests should verify:
 
 CLI uses subcommands with Pydantic argument parsing:
 - `scia analyze --before before.json --after after.json --format {json|markdown}`
+- `scia analyze --before before.json --after migration.sql --dialect snowflake --format {json|markdown}`
 - `scia diff --before before.json --after after.json`
+
+**Dialect Support:**
+- `--dialect` flag accepts: `snowflake, postgres, mysql, bigquery, databricks, redshift`
+- Default: `snowflake`
+- **Note: Only Snowflake dialect is currently fully supported** with dialect-specific preprocessing (e.g., `ALTER TABLE ... MODIFY COLUMN` syntax). Other dialects use generic SQL parsing.
 
 Exit codes: 0 (success), 1 (matches fail-on threshold)
 

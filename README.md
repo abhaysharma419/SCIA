@@ -77,6 +77,9 @@ Analyze risk of applying a SQL migration to an existing schema (JSON or DB).
 ```bash
 # Apply migration.sql to schema in base_schema.json
 scia analyze --before base_schema.json --after migration.sql --format markdown
+
+# Specify dialect for SQL parsing (currently only snowflake fully supported)
+scia analyze --before base_schema.json --after migration.sql --dialect snowflake --format markdown
 ```
 *Supported ALTER operations:* `ADD COLUMN`, `DROP COLUMN`, `RENAME COLUMN`, `ALTER COLUMN (TYPE/NULLABILITY)`.
 
@@ -225,6 +228,7 @@ scia analyze --before <before.json> --after <after.json> [options]
 | `--warehouse` | ❌ | `snowflake` | Warehouse type (required for DB mode) |
 | `--conn-file` | ❌ | `config.yaml` | Connection config file |
 | `--dependency-depth`| ❌ | `3` | Max depth for dependency analysis (1-10) |
+| `--dialect` | ❌ | `snowflake` | SQL dialect for parsing (snowflake, postgres, mysql, bigquery, databricks, redshift). Default: snowflake. **Note: Only snowflake dialect is fully supported currently.** |
 | `--format` | ❌ | `json` or `markdown` | Output format (default: json) |
 | `--fail-on` | ❌ | `HIGH` | Exit code 1 if risk meets threshold |
 

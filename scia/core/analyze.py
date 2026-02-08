@@ -71,15 +71,14 @@ async def analyze(
                     estimated_blast_radius=len(downstream)
                 )
 
-                # Adjust risk score based on blast radius
-                # If no dependents found, reduce risk by 25% (as per user preference)
-                adjusted_score = finding.risk_score
-                if impact.estimated_blast_radius == 0 and finding.base_risk > 0:
-                    adjusted_score = int(finding.risk_score * 0.75)
+                # Note: We no longer adjust risk score based on blast radius
+                # Breaking changes should always be flagged at their full severity
+                # for CI/CD pipeline safety. The impact_detail is for informational
+                # purposes only.
 
                 enriched = EnrichedFinding(
                     **finding.model_dump(exclude={"risk_score"}),
-                    risk_score=adjusted_score,
+                    risk_score=finding.risk_score,
                     impact_detail=impact
                 )
                 final_findings.append(enriched)
