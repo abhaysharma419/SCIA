@@ -1,6 +1,7 @@
 """DDL (Data Definition Language) parser for schema creation and modification."""
 import logging
-from typing import List, Optional
+import re
+from typing import Callable, Dict, List, Optional
 
 import sqlglot
 from sqlglot import exp
@@ -8,6 +9,102 @@ from sqlglot import exp
 from scia.models.schema import ColumnSchema, TableSchema
 
 logger = logging.getLogger(__name__)
+
+# Registry of dialect-specific preprocessors
+# Key: dialect name (e.g., 'snowflake', 'postgres', etc.)
+# Value: List of preprocessor functions
+_DIALECT_PREPROCESSORS: Dict[str, List[Callable[[str], str]]] = {}
+
+
+def register_dialect_preprocessor(dialect: str, func: Callable[[str], str]) -> None:
+    """Register a dialect-specific SQL preprocessor.
+    
+    This allows extending support for dialect-specific syntax that sqlglot
+    doesn't natively handle. Preprocessors run before sqlglot parsing to
+    convert dialect-specific syntax to standard forms.
+    
+    Args:
+        dialect: SQL dialect name (e.g., 'snowflake', 'postgres')
+        func: Preprocessor function that takes SQL string and returns modified SQL
+        
+    Example:
+        @register_dialect_preprocessor('snowflake')
+        def fix_snowflake_syntax(sql: str) -> str:
+            # Convert Snowflake-specific syntax
+            return sql.replace('SOMETHING', 'STANDARD')
+    """
+    if dialect not in _DIALECT_PREPROCESSORS:
+        _DIALECT_PREPROCESSORS[dialect] = []
+    _DIALECT_PREPROCESSORS[dialect].append(func)
+    logger.debug("Registered preprocessor for dialect '%s': %s", dialect, func.__name__)
+
+
+def _preprocess_sql(sql: str, dialect: str) -> str:
+    """Apply dialect-specific preprocessors to SQL.
+    
+    Args:
+        sql: Original SQL text
+        dialect: SQL dialect name
+        
+    Returns:
+        Modified SQL with dialect-specific syntax converted to standard forms
+    """
+    if dialect not in _DIALECT_PREPROCESSORS:
+        return sql
+    
+    original_sql = sql
+    for preprocessor in _DIALECT_PREPROCESSORS[dialect]:
+        try:
+            sql = preprocessor(sql)
+        except Exception as e:
+            logger.warning("Preprocessor %s failed: %s", preprocessor.__name__, e)
+    
+    if sql != original_sql:
+        logger.debug("SQL was modified by preprocessor for dialect '%s'", dialect)
+    
+    return sql
+
+
+def _preprocess_snowflake_modify_column(sql: str) -> str:
+    """Convert Snowflake 'ALTER TABLE ... MODIFY COLUMN' to standard 'ALTER TABLE ... ALTER COLUMN ... TYPE'.
+    
+    Snowflake supports both syntaxes, but sqlglot only parses the ALTER COLUMN form.
+    This preprocessor converts MODIFY COLUMN syntax to the standard form.
+    
+    Examples:
+        ALTER TABLE t MODIFY COLUMN c VARCHAR(255) -> ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(255)
+        ALTER TABLE t MODIFY c VARCHAR(255) -> ALTER TABLE t ALTER COLUMN c TYPE VARCHAR(255)
+    
+    Args:
+        sql: SQL potentially containing MODIFY COLUMN statements
+        
+    Returns:
+        SQL with MODIFY COLUMN converted to ALTER COLUMN TYPE
+    """
+    # Pattern: ALTER TABLE <table> MODIFY [COLUMN] <col_name> <data_type>
+    # Matches: ALTER TABLE ... MODIFY COLUMN col_name type or ALTER TABLE ... MODIFY col_name type
+    pattern = re.compile(
+        r'ALTER\s+TABLE\s+(\S+)\s+MODIFY(?:\s+COLUMN)?\s+(\S+)\s+(\S+(?:\([^)]*\))?)',
+        re.IGNORECASE
+    )
+    
+    def replace_match(match):
+        table_name = match.group(1)
+        column_name = match.group(2)
+        data_type = match.group(3)
+        # Convert to: ALTER TABLE table_name ALTER COLUMN column_name TYPE data_type
+        return f"ALTER TABLE {table_name} ALTER COLUMN {column_name} TYPE {data_type}"
+    
+    modified_sql = pattern.sub(replace_match, sql)
+    
+    if modified_sql != sql:
+        logger.debug("Converted MODIFY COLUMN to ALTER COLUMN TYPE syntax")
+    
+    return modified_sql
+
+
+# Register Snowflake preprocessor
+register_dialect_preprocessor('snowflake', _preprocess_snowflake_modify_column)
 
 
 def parse_ddl_to_schema(
@@ -41,8 +138,12 @@ def parse_ddl_to_schema(
             schemas[key] = schema.model_copy(deep=True)
 
     try:
+        # Preprocess SQL for dialect-specific syntax
+        # This converts unsupported syntax to standard forms before sqlglot parsing
+        processed_sql = _preprocess_sql(ddl_sql, 'snowflake')
+        
         # Parse all statements in the DDL
-        statements = sqlglot.parse(ddl_sql, read='snowflake')
+        statements = sqlglot.parse(processed_sql, read='snowflake')
 
         for stmt in statements:
             if not stmt:
@@ -324,6 +425,5 @@ def _handle_alter_table(
 
     except Exception as e:  # pylint: disable=broad-except
         logger.warning("Failed to parse ALTER TABLE: %s", e)
-
 
 

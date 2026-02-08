@@ -81,6 +81,25 @@ def test_alter_table_modify_column():
     assert len(updated_schemas) == 1
     assert updated_schemas[0].columns[0].data_type == "BIGINT"
 
+def test_alter_table_modify_column_snowflake_syntax():
+    """Test ALTER TABLE MODIFY COLUMN with Snowflake syntax."""
+    base_schema = [
+        TableSchema(
+            schema_name="PUBLIC",
+            table_name="USERS",
+            columns=[
+                ColumnSchema(schema_name="PUBLIC", table_name="USERS", column_name="USERNAME", data_type="VARCHAR(100)", is_nullable=True, ordinal_position=1)
+            ]
+        )
+    ]
+    
+    # Snowflake MODIFY COLUMN syntax (parsed as Command by sqlglot)
+    ddl = "ALTER TABLE SCIA_TEST_DB.PUBLIC.USERS modify column USERNAME VARCHAR(255)"
+    updated_schemas = parse_ddl_to_schema(ddl, base_schemas=base_schema)
+    
+    assert len(updated_schemas) == 1
+    assert updated_schemas[0].columns[0].data_type == "VARCHAR(255)"
+
 def test_multiple_alter_statements():
     """Test multiple ALTER statements in one script."""
     base_schema = [

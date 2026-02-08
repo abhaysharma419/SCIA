@@ -5,6 +5,8 @@ from typing import List, Optional, Set
 import sqlglot
 from sqlglot import exp
 
+from scia.sql.ddl_parser import _preprocess_sql
+
 logger = logging.getLogger(__name__)
 
 class SQLMetadata:  # pylint: disable=too-few-public-methods
@@ -46,15 +48,17 @@ def _extract_join_keys(join: exp.Join, metadata: SQLMetadata):
         if len(cols) == 2:
             metadata.join_keys.append(tuple(cols))
 
-def parse_sql(sql: str) -> Optional[SQLMetadata]:
+def parse_sql(sql: str, dialect: str = 'snowflake') -> Optional[SQLMetadata]:
     """Best-effort SQL parsing for structural signals.
 
     Never raises fatal exception, returns None on failure.
     """
     try:
         metadata = SQLMetadata()
-        # Using snowflake dialect as default for v0.1
-        for expression in sqlglot.parse(sql, read="snowflake"):
+        # Preprocess SQL for dialect-specific syntax
+        processed_sql = _preprocess_sql(sql, dialect)
+        # Parse using specified dialect
+        for expression in sqlglot.parse(processed_sql, read=dialect):
             if expression:
                 _extract_metadata(expression, metadata)
         return metadata
@@ -74,7 +78,9 @@ def extract_table_references(sql: str, dialect: str = 'snowflake') -> List[str]:
         Empty list if parsing fails.
     """
     try:
-        statements = sqlglot.parse(sql, read=dialect)
+        # Preprocess SQL for dialect-specific syntax
+        processed_sql = _preprocess_sql(sql, dialect)
+        statements = sqlglot.parse(processed_sql, read=dialect)
         tables = set()
 
         for stmt in statements:
