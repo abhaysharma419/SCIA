@@ -28,12 +28,16 @@ SCIA v0.2 supports the following DDL operations:
 - `ALTER TABLE DROP COLUMN`
 - `ALTER TABLE RENAME COLUMN`
 - `ALTER TABLE ALTER COLUMN` (type changes, nullability changes)
+- `ALTER TABLE MODIFY COLUMN` (Snowflake-specific syntax)
 
 ### Basic SQL Migration Analysis
 
 ```bash
 # Analyze a migration file against a base schema (JSON)
 scia analyze --before base_schema.json --after migration.sql --format markdown
+
+# Specify SQL dialect for parsing (currently only snowflake fully supported)
+scia analyze --before base_schema.json --after migration.sql --dialect snowflake --format markdown
 ```
 
 ### Example Migration File
@@ -351,8 +355,15 @@ scia analyze --before PROD.ANALYTICS --after migration.sql --warehouse snowflake
 
 **Solutions**:
 1. Check which DDL operations are supported (see above)
-2. SCIA will continue analysis with schema-based rules only
-3. Review warnings in output
+2. Use `--dialect` flag to specify your SQL dialect:
+   ```bash
+   # Currently only snowflake dialect is fully supported
+   scia analyze --before base.json --after migration.sql --dialect snowflake
+   ```
+3. SCIA will continue analysis with schema-based rules only
+4. Review warnings in output
+
+**Note**: The `--dialect` flag accepts: `snowflake`, `postgres`, `mysql`, `bigquery`, `databricks`, `redshift`. However, only **Snowflake** dialect is currently fully supported with dialect-specific syntax handling. Other dialects use generic SQL parsing and may have limited support for warehouse-specific syntax.
 
 ---
 

@@ -71,7 +71,7 @@ def rule_column_removed(diff: SchemaDiff) -> List[Finding]:
                 finding_type=FindingType.COLUMN_REMOVED,
                 severity=Severity.HIGH,
                 base_risk=80,
-                evidence={"table": change.table_name, "column": change.column_name},
+                evidence={"schema": change.schema_name, "table": change.table_name, "column": change.column_name},
                 description=(
                     f"Column '{change.column_name}' removed from table "
                     f"'{change.table_name}'."
@@ -88,7 +88,7 @@ def rule_column_added(diff: SchemaDiff) -> List[Finding]:
                 finding_type=FindingType.COLUMN_ADDED,
                 severity=Severity.LOW,
                 base_risk=0,
-                evidence={"table": change.table_name, "column": change.column_name},
+                evidence={"schema": change.schema_name, "table": change.table_name, "column": change.column_name},
                 description=(
                     f"New column '{change.column_name}' added to table "
                     f"'{change.table_name}'."
@@ -124,6 +124,7 @@ def rule_column_type_changed(diff: SchemaDiff,
                 severity=severity,
                 base_risk=risk,
                 evidence={
+                    "schema": change.schema_name,
                     "table": change.table_name,
                     "column": change.column_name,
                     "before": change.before.data_type,
@@ -148,6 +149,7 @@ def rule_nullability_changed(diff: SchemaDiff) -> List[Finding]:
                     severity=Severity.MEDIUM,
                     base_risk=50,
                     evidence={
+                        "schema": change.schema_name,
                         "table": change.table_name,
                         "column": change.column_name
                     },
@@ -181,6 +183,7 @@ def rule_join_key_changed(diff: SchemaDiff,
                     severity=Severity.HIGH,
                     base_risk=90,
                     evidence={
+                        "schema": change.schema_name,
                         "table": change.table_name,
                         "column": change.column_name,
                         "change_type": change.change_type
@@ -215,6 +218,7 @@ def rule_grain_change(diff: SchemaDiff,
                 severity=Severity.MEDIUM,
                 base_risk=60,
                 evidence={
+                    "schema": change.schema_name,
                     "table": change.table_name,
                     "column": change.column_name
                 },
