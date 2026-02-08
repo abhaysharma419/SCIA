@@ -23,7 +23,8 @@ class InputResolutionError(ValueError):
 def resolve_input(
     before: str,
     after: str,
-    warehouse: Optional[str] = None
+    warehouse: Optional[str] = None,
+    dialect: Optional[str] = None
 ) -> Tuple[InputType, dict]:
     """Detect and resolve input sources for schema comparison.
 
@@ -88,6 +89,7 @@ def resolve_input(
         'before_format': before_format,
         'after_format': after_format,
         'input_type': input_type.value,
+        'dialect': dialect or 'snowflake',  # Default to snowflake if not specified
     }
 
     if warehouse:

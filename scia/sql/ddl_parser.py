@@ -109,7 +109,8 @@ register_dialect_preprocessor('snowflake', _preprocess_snowflake_modify_column)
 
 def parse_ddl_to_schema(
     ddl_sql: str,
-    base_schemas: Optional[List[TableSchema]] = None
+    base_schemas: Optional[List[TableSchema]] = None,
+    dialect: str = 'snowflake'
 ) -> List[TableSchema]:
     """Parse CREATE TABLE and ALTER TABLE DDL statements to schema objects.
 
@@ -125,6 +126,8 @@ def parse_ddl_to_schema(
 
     Args:
         ddl_sql: DDL SQL text (one or more statements)
+        base_schemas: Optional list of base schemas for ALTER TABLE operations
+        dialect: SQL dialect for parsing (default: 'snowflake')
 
     Returns:
         List of TableSchema objects extracted from CREATE TABLE and ALTER TABLE statements.
@@ -140,10 +143,10 @@ def parse_ddl_to_schema(
     try:
         # Preprocess SQL for dialect-specific syntax
         # This converts unsupported syntax to standard forms before sqlglot parsing
-        processed_sql = _preprocess_sql(ddl_sql, 'snowflake')
+        processed_sql = _preprocess_sql(ddl_sql, dialect)
         
         # Parse all statements in the DDL
-        statements = sqlglot.parse(processed_sql, read='snowflake')
+        statements = sqlglot.parse(processed_sql, read=dialect)
 
         for stmt in statements:
             if not stmt:
