@@ -205,16 +205,18 @@ class SnowflakeAdapter(WarehouseAdapter):
 
             # Fetch all rows and map them to the expected format
             # Column indices for SHOW IMPORTED KEYS:
-            # 2: pk_table_name, 3: pk_column_name, 6: fk_table_name, 7: fk_column_name, 11: fk_name
+            # [3] pk_table_name, [4] pk_column_name (referenced table/column)
+            # [7] fk_table_name, [8] fk_column_name (foreign key table/column)
+            # [12] fk_name (constraint name)
             rows = cursor.fetchall()
             result = []
             for row in rows:
                 result.append({
-                    'constraint_name': row[11],
-                    'table_name': row[6],
-                    'column_name': row[7],
-                    'referenced_table': row[2],
-                    'referenced_column': row[3]
+                    'constraint_name': row[12],
+                    'table_name': row[7],  # fk_table_name - the table with the FK
+                    'column_name': row[8],  # fk_column_name - the FK column
+                    'referenced_table': row[3],  # pk_table_name - the referenced table
+                    'referenced_column': row[4]  # pk_column_name - the referenced column
                 })
 
             logger.info("Fetched %d foreign keys from %s.%s", len(result), database, schema)

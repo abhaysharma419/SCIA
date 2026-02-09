@@ -112,3 +112,47 @@ async def analyze_upstream(
         logger.warning("Failed to fetch foreign keys for upstream analysis: %s", e)
 
     return all_upstream
+
+
+async def analyze_downstream_fks(
+    changed_table: str,
+    warehouse_adapter: WarehouseAdapter
+) -> List[DependencyObject]:
+    """Find tables that have foreign keys referencing this table.
+
+    This detects downstream impact where other tables depend on the changed table
+    via foreign key constraints.
+
+    Args:
+        changed_table: Fully qualified table name (DATABASE.SCHEMA.TABLE)
+        warehouse_adapter: Adapter to query warehouse metadata
+
+    Returns:
+        List of DependencyObject representing tables with FKs to changed_table.
+    """
+    database, schema, table_name = parse_identifier(changed_table)
+    if not table_name:
+        return []
+
+    table_name = table_name.upper()
+
+    all_downstream_fks = []
+    try:
+        fks = warehouse_adapter.fetch_foreign_keys(database, schema)
+        for fk in fks:
+            # Check if this FK references our changed table
+            if fk.get('referenced_table', '').upper() == table_name:
+                dep_obj = DependencyObject(
+                    object_type="TABLE",
+                    name=fk.get('table_name', ''),
+                    schema=schema,
+                    is_critical=True  # FK relationships indicate tight coupling
+                )
+                # Avoid duplicates
+                if not any(d.name == dep_obj.name and d.schema == dep_obj.schema 
+                          for d in all_downstream_fks):
+                    all_downstream_fks.append(dep_obj)
+    except Exception as e: # pylint: disable=broad-except
+        logger.warning("Failed to fetch foreign keys for downstream analysis: %s", e)
+
+    return all_downstream_fks

@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Optional
 
 from scia.core.diff import diff_schemas
-from scia.core.impact import analyze_downstream, analyze_upstream
+from scia.core.impact import analyze_downstream, analyze_downstream_fks, analyze_upstream
 from scia.core.risk import RiskAssessment
 from scia.core.rules import apply_rules
 from scia.models.finding import EnrichedFinding, ImpactDetail
@@ -62,13 +62,18 @@ async def analyze(
                     lookup_name, warehouse_adapter, max_depth=max_dependency_depth
                 )
                 upstream = await analyze_upstream(lookup_name, warehouse_adapter)
+                downstream_fks = await analyze_downstream_fks(lookup_name, warehouse_adapter)
+
+                # Calculate total blast radius including both views and tables with FKs
+                total_blast_radius = len(downstream) + len(downstream_fks)
 
                 impact = ImpactDetail(
                     direct_dependents=downstream,
                     transitive_dependents=[],
                     upstream_dependencies=upstream,
+                    downstream_tables=downstream_fks,
                     affected_applications=[],
-                    estimated_blast_radius=len(downstream)
+                    estimated_blast_radius=total_blast_radius
                 )
 
                 # Note: We no longer adjust risk score based on blast radius
