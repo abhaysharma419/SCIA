@@ -16,7 +16,7 @@ Works with JSON exports, SQL migration files, or live warehouse connections.
 ### 1. Install
 
 ```bash
-pip install scia
+pip install scia-core
 ```
 
 ### 2. Prepare Schema Files

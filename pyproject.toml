@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scia"
+name = "scia-core"
 version = "0.2.0"
 description = "Deterministic SQL Change Impact Analyzer"
 readme = "README.md"
