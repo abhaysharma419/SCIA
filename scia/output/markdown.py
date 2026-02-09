@@ -68,6 +68,19 @@ def render_markdown(assessment: RiskAssessment) -> str:
                         )
                 else:
                     lines.append("No direct downstream dependents identified.")
+                
+                # Show tables with FKs referencing this table
+                if impact.downstream_tables:
+                    lines.append("")
+                    lines.append("#### 🔗 Tables Referencing This Table (via Foreign Keys)")
+                    lines.append("| Table | Schema | Critical |")
+                    lines.append("|-------|--------|----------|")
+                    for dep in impact.downstream_tables:
+                        lines.append(
+                            f"| {dep.name} | {dep.schema_name} | "
+                            f"{'Yes' if dep.is_critical else 'No'} |"
+                        )
+                
                 lines.append(f"- **Estimated Blast Radius:** {impact.estimated_blast_radius}")
             lines.append("")
 

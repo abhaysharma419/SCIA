@@ -114,13 +114,13 @@ def test_snowflake_adapter_fetch_foreign_keys_success(adapter):
     """Test successful foreign keys fetch."""
     mock_cursor = MagicMock()
     # Mock result for SHOW IMPORTED KEYS
-    # Indices: 2=pk_table, 3=pk_column, 6=fk_table, 7=fk_column, 11=fk_name
-    row = [None] * 14
-    row[2] = 'USERS'
-    row[3] = 'USER_ID'
-    row[6] = 'ORDERS'
-    row[7] = 'USER_ID'
-    row[11] = 'FK_USER_ID'
+    # Indices: [3]=pk_table_name, [4]=pk_column_name, [7]=fk_table_name, [8]=fk_column_name, [12]=fk_name
+    row = [None] * 17
+    row[3] = 'USERS'
+    row[4] = 'USER_ID'
+    row[7] = 'ORDERS'
+    row[8] = 'USER_ID'
+    row[12] = 'FK_USER_ID'
 
     mock_cursor.fetchall.return_value = [row]
 
@@ -133,6 +133,9 @@ def test_snowflake_adapter_fetch_foreign_keys_success(adapter):
     assert len(fks) == 1
     assert fks[0]['constraint_name'] == 'FK_USER_ID'
     assert fks[0]['table_name'] == 'ORDERS'
+    assert fks[0]['column_name'] == 'USER_ID'
+    assert fks[0]['referenced_table'] == 'USERS'
+    assert fks[0]['referenced_column'] == 'USER_ID'
 
 
 def test_snowflake_adapter_fetch_foreign_keys_no_connection(adapter):
